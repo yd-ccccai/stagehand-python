@@ -52,14 +52,14 @@ export class ActionLogger {
   }
 
   log(logLine: LogLine) {
-    if (!this.initialized) {
+    if (!this.controller || !this.encoder) {
       throw new Error("ActionLogger not initialized");
     }
     console.log(logLineToString(logLine));
-    // this.controller.enqueue(
-    //   this.encoder.encode(logLineToString(logLine) + "\n")
-    // );
-    // this.logs.push(parseLogLine(logLine));
+    this.controller.enqueue(
+      this.encoder.encode(logLineToString(logLine) + "\n")
+    );
+    this.logs.push(parseLogLine(logLine));
   }
 
   error(logLine: LogLine) {
