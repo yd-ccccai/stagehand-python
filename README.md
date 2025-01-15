@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stagehand Python SDK
 
-## Getting Started
+A Python SDK for Stagehand, enabling automated browser control and data extraction.
 
-First, run the development server:
+## Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pip install stagehand-py
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Quickstart
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Before running your script, make sure you have exported the necessary environment variables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+export BROWSERBASE_API_KEY="your-api-key"
+export BROWSERBASE_PROJECT_ID="your-project-id"
+export OPENAI_API_KEY="your-openai-api-key"
+export SERVER_URL="url-of-stagehand-server" 
+```
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+Here is a minimal example to get started:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```python
+import asyncio
+import os
+from stagehand import Stagehand
+from dotenv import load_dotenv
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+load_dotenv()
 
-## Deploy on Vercel
+async def log_handler(log_data: dict):
+    """
+    Enhanced async log handler that shows more detailed server logs.
+    """
+    # Print the full log data structure
+    if "type" in log_data:
+        log_type = log_data["type"]
+        data = log_data.get("data", {})
+        
+        if log_type == "system":
+            print(f"🔧 SYSTEM: {data}")
+        elif log_type == "log":
+            print(f"📝 LOG: {data}")
+        else:
+            print(f"ℹ️ OTHER [{log_type}]: {data}")
+    else:
+        # Fallback for any other format
+        print(f"🤖 RAW LOG: {log_data}")
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+async def main():
+    # Create a Stagehand client - it will create a new session automatically
+    stagehand = Stagehand(
+        server_url=os.getenv("SERVER_URL"),
+        browserbase_api_key=os.getenv("BROWSERBASE_API_KEY"),
+        browserbase_project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        on_log=log_handler,  # attach the log handler to receive streaming logs
+        verbose=2,
+        model_name="gpt-4o",  # optional - defaults to server's default
+        dom_settle_timeout_ms=3000,  # optional - defaults to server's default
+        debug_dom=True,  # optional - defaults to server's default
+    )
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+    # Initialize - this will create a new session
+    await stagehand.init()
+    print(f"Created new session: {stagehand.session_id}")
+
+    # Example: navigate to google.com
+    await stagehand.navigate("https://www.google.com")
+    print("Navigation complete.")
+
+    # Example: ACT to do something like 'search for openai'
+    result = await stagehand.act("search for openai")
+    print("Action result:", result)
+
+    # Close the session (if needed)
+    # await stagehand.close()
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Configuration
+
+- `server_url`: The Stagehand server URL (default: http://localhost:3000)
+- `browserbase_api_key`: Your BrowserBase API key (can also be set via BROWSERBASE_API_KEY environment variable)
+- `browserbase_project_id`: Your BrowserBase project ID (can also be set via BROWSERBASE_PROJECT_ID environment variable)
+- `openai_api_key`: Your OpenAI API key (can also be set via OPENAI_API_KEY environment variable)
+- `verbose`: Verbosity level (default: 1)
+- `model_name`: (optional) Model name to use for the conversation
+- `dom_settle_timeout_ms`: (optional) Additional time for the DOM to settle
+- `debug_dom`: (optional) Whether or not to enable DOM debug mode
+
+## Features
+
+- Automated browser control with natural language commands
+- Data extraction with schema validation (either pydantic or JSON schema)
+- Async/await support
+
+## Requirements
+
+- Python 3.7+
+- httpx
+- asyncio
+- pydantic
+- python-dotenv (optional if using a .env file)
+
+## License
+
+MIT License (c) Browserbase, Inc.
