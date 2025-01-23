@@ -13,10 +13,36 @@ class StagehandPage:
         """Navigate to URL using Playwright directly"""
         return await self.page.goto(url, **kwargs)
 
-    # add server side navigate
-    async def navigate(self, url: str, **kwargs):
-        """Navigate to URL using Stagehand server"""
-        return await self._stagehand._execute("goto", [url])
+    async def navigate(
+        self, 
+        url: str, 
+        *, 
+        referer: Optional[str] = None,
+        timeout: Optional[int] = None, 
+        wait_until: Optional[str] = None
+    ):
+        """
+        Navigate to URL using Stagehand server
+        
+        Args:
+            url: The URL to navigate to
+            referer: Optional referer URL
+            timeout: Optional navigation timeout in milliseconds
+            wait_until: Optional wait until condition ('load'|'domcontentloaded'|'networkidle'|'commit')
+        """
+        options = {}
+        if referer is not None:
+            options["referer"] = referer
+        if timeout is not None:
+            options["timeout"] = timeout
+        if wait_until is not None:
+            options["waitUntil"] = wait_until
+            
+        payload = {"url": url}
+        if options:
+            payload["options"] = options
+            
+        return await self._stagehand._execute("navigate", payload)
     
     async def act(self, action: str):
         """Execute AI action via Stagehand server"""
