@@ -91,8 +91,23 @@ class StagehandPage:
             
         return await self._stagehand._execute("observe", payload)
         
-    async def extract(self, instruction: str, schema: Union[Dict[str, Any], type(BaseModel)], **kwargs):
-        """Extract data using AI via Stagehand server"""
+    async def extract(
+        self,
+        instruction: str,
+        schema: Union[Dict[str, Any], type(BaseModel)],
+        *,
+        use_text_extract: Optional[bool] = None,
+        **kwargs
+    ):
+        """
+        Extract data using AI via Stagehand server
+        
+        Args:
+            instruction: The instruction for what data to extract
+            schema: JSON schema as dict or Pydantic model class defining the structure
+            use_text_extract: Optional boolean to control text extraction mode
+            **kwargs: Additional arguments to pass to the server
+        """
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             schema_definition = schema.schema()
         elif isinstance(schema, dict):
@@ -100,9 +115,17 @@ class StagehandPage:
         else:
             raise ValueError("schema must be a dict or Pydantic model class")
             
-        args = {"instruction": instruction, "schemaDefinition": schema_definition}
-        args.update(kwargs)
-        return await self._stagehand._execute("extract", [args])
+        payload = {
+            "instruction": instruction,
+            "schemaDefinition": schema_definition
+        }
+        
+        if use_text_extract is not None:
+            payload["useTextExtract"] = use_text_extract
+            
+        payload.update(kwargs)
+        
+        return await self._stagehand._execute("extract", payload)
 
     # Forward other Page methods to underlying Playwright page
     def __getattr__(self, name):
