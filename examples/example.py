@@ -1,9 +1,16 @@
 import asyncio
 import os
+import logging
 from dotenv import load_dotenv
 from stagehand.client import Stagehand
 
 load_dotenv()
+# Configure logging at the start of the script
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 async def log_handler(log_data: dict):
     """
@@ -42,16 +49,33 @@ async def main():
     await stagehand.init()
     print(f"Created new session with ID: {stagehand.session_id}")
 
-    # Example: navigate to google.com
-    await stagehand.navigate("https://www.google.com")
-    print("Navigation complete.")
+    await asyncio.sleep(10)
 
-    # Example: ACT to do something like 'search for openai'
-    result = await stagehand.act("search for openai")
+    # SERVER side playwright page in TS - navigate FIRST 
+    # Need to inject scripts into the browsers current context's DOM from TS first
+    await stagehand.page.navigate("https://news.ycombinator.com/")
+    print("Navigation complete server side.")
+    
+    # Wait 10 seconds
+    await asyncio.sleep(10)
+    print("Waited 10 seconds")
+
+    # CLIENT side Playwright page in Python - navigate
+    await stagehand.page.goto("https://www.google.com")
+    print("Navigation complete client side.")
+
+    # Hosted Stagehand - ACT to do something like 'search for openai'
+    result = await stagehand.page.act("search for openai")
     print("Action result:", result)
 
+    await asyncio.sleep(5)
+
+    # Pure client side Playwright - after searching for OpenAI, click on the News tab
+    await stagehand.page.get_by_role("link", name="News", exact=True).first.click()
+    print("Clicked on News tab")
+
     # You can observe the DOM or environment after that
-    observations = await stagehand.observe({"timeoutMs": 3000})
+    observations = await stagehand.page.observe({"timeoutMs": 3000})
     print("Observations:", observations)
 
 if __name__ == "__main__":
