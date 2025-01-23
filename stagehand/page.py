@@ -44,13 +44,52 @@ class StagehandPage:
             
         return await self._stagehand._execute("navigate", payload)
     
-    async def act(self, action: str):
-        """Execute AI action via Stagehand server"""
-        return await self._stagehand._execute("act", [{"action": action}])
+    async def act(
+        self, 
+        action: str, 
+        *, 
+        use_vision: Optional[Union[bool, str]] = None,
+        variables: Optional[Dict[str, str]] = None
+    ):
+        """
+        Execute AI action via Stagehand server
         
-    async def observe(self, options: Optional[Dict[str, Any]] = None):
-        """Make AI observation via Stagehand server"""
-        return await self._stagehand._execute("observe", [options or {}])
+        Args:
+            action: The action instruction for the AI
+            use_vision: Optional boolean or "fallback" to control vision usage
+            variables: Optional variables to substitute in the action
+        """
+        payload = {"action": action}
+        if use_vision is not None:
+            payload["useVision"] = use_vision
+        if variables is not None:
+            payload["variables"] = variables
+            
+        return await self._stagehand._execute("act", payload)
+        
+    async def observe(
+        self,
+        instruction: Optional[str] = None,
+        use_vision: Optional[bool] = None,
+        use_accessibility_tree: Optional[bool] = None
+    ):
+        """
+        Make AI observation via Stagehand server
+
+        Args:
+            instruction: Optional instruction to guide the observation
+            use_vision: Optional boolean to control vision usage
+            use_accessibility_tree: Optional boolean to control accessibility tree usage
+        """
+        payload = {}
+        if instruction is not None:
+            payload["instruction"] = instruction
+        if use_vision is not None:
+            payload["useVision"] = use_vision
+        if use_accessibility_tree is not None:
+            payload["useAccessibilityTree"] = use_accessibility_tree
+            
+        return await self._stagehand._execute("observe", payload)
         
     async def extract(self, instruction: str, schema: Union[Dict[str, Any], type(BaseModel)], **kwargs):
         """Extract data using AI via Stagehand server"""
