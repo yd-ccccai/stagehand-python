@@ -51,9 +51,6 @@ async def main():
         await stagehand.page.navigate("https://github.com/facebook/react")
         print("Navigation complete.")
 
-        result = await stagehand.page.act("find the number of stars for the project but dont click on the link")
-        print("Action result:", result)
-
         # Define schema for stars extraction
         # extract_schema = {
         #     "type": "object",

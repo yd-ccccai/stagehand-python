@@ -259,6 +259,7 @@ class Stagehand:
                 raise RuntimeError(f"Missing sessionId in response: {resp.text}")
 
             self.session_id = data["sessionId"]
+    
     async def _execute(self, method: str, payload: Dict[str, Any]) -> Any:
         """
         Internal helper to call /api/execute with the given method and payload.
