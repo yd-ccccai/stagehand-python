@@ -259,16 +259,12 @@ class Stagehand:
                 raise RuntimeError(f"Missing sessionId in response: {resp.text}")
 
             self.session_id = data["sessionId"]
-
-    async def _execute(self, method: str, args: List[Any]) -> Any:
+    
+    async def _execute(self, method: str, payload: Dict[str, Any]) -> Any:
         """
-        Internal helper to call /api/execute with the given method and args.
+        Internal helper to call /api/execute with the given method and payload.
         Streams line-by-line, returning the 'result' from the final message (if any).
         """
-        payload = {
-            "method": method,
-            "args": args,
-        }
 
         headers = {
             "browserbase-session-id": self.session_id,
@@ -281,12 +277,11 @@ class Stagehand:
 
         # We'll collect final_result from the 'finished' system message
         final_result = None
-
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         async with client:
             async with client.stream(
-                "POST",
-                f"{self.server_url}/api/execute",
+                "POST", 
+                f"{self.server_url}/api/{method}",
                 json=payload,
                 headers=headers,
             ) as response:

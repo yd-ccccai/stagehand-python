@@ -48,11 +48,8 @@ async def main():
 
     try:
 
-        await stagehand.navigate("https://github.com/facebook/react")
+        await stagehand.page.navigate("https://github.com/facebook/react")
         print("Navigation complete.")
-
-        result = await stagehand.act("find the number of stars for the project but dont click on the link")
-        print("Action result:", result)
 
         # Define schema for stars extraction
         # extract_schema = {
@@ -70,7 +67,7 @@ async def main():
         extract_schema = ExtractSchema
         
         # Extract data using the schema
-        data = await stagehand.extract(
+        data = await stagehand.page.extract(
             instruction="Extract the number of stars for the project",
             schema=extract_schema
         )
