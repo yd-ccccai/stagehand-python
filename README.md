@@ -51,23 +51,29 @@ You can write all of your Playwright commands as you normally would, while offlo
 Here's a sample of what you can do with Stagehand:
 
 ```python
-# Keep your existing Playwright code unchanged
-await page.goto("https://docs.stagehand.dev");
+import asyncio
 
-# Stagehand AI: Act on the page via Stagehand API
-await page.act("click on the 'Quickstart'");
+async def main():
+    # Keep your existing Playwright code unchanged
+    await page.goto("https://docs.stagehand.dev");
 
-# Stagehand AI: Extract data from the page
-from pydantic import BaseModel
+    # Stagehand AI: Act on the page via Stagehand API
+    await page.act("click on the 'Quickstart'");
 
-class DescriptionSchema(BaseModel):
-    description: str
+    # Stagehand AI: Extract data from the page
+    from pydantic import BaseModel
 
-data = await page.extract(
-    instruction="extract the description of the page",
-    schema=DescriptionSchema
-)
-description = data.description
+    class DescriptionSchema(BaseModel):
+        description: str
+
+    data = await page.extract(
+        instruction="extract the description of the page",
+        schema=DescriptionSchema
+    )
+    description = data.description
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Why?
