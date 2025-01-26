@@ -53,7 +53,7 @@ class Stagehand:
         :param timeout_settings: Optional custom timeout settings for httpx.
         """
 
-        self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL", "http://localhost:3000")
+        self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
         self.session_id = session_id
         self.browserbase_api_key = browserbase_api_key or os.getenv("BROWSERBASE_API_KEY")
         self.browserbase_project_id = browserbase_project_id or os.getenv("BROWSERBASE_PROJECT_ID")

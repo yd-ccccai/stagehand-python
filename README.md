@@ -143,9 +143,19 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+
+## More Examples
+
+For further examples, you can check out the scripts in the “examples/” directory:
+
+1. “examples/example.py”: Demonstrates combined server-side/page navigation and AI-based actions.  
+2. “examples/extract-example.py”: Shows how to use the “extract” functionality with JSON schema or a pydantic model.  
+3. “examples/observe-example.py”: Demonstrates the “observe” functionality to get natural-language readings of the page.  
+
+
 ## Configuration
 
-- `stagehand_server_url`: The Stagehand server URL (default: http://localhost:3000)
+- `stagehand_server_url`: The Stagehand API server URL
 - `browserbase_api_key`: Your BrowserBase API key (can also be set via BROWSERBASE_API_KEY environment variable)
 - `browserbase_project_id`: Your BrowserBase project ID (can also be set via BROWSERBASE_PROJECT_ID environment variable)
 - `openai_api_key`: Your OpenAI API key (can also be set via OPENAI_API_KEY environment variable)
