@@ -11,7 +11,9 @@ class StagehandPage:
         
     async def goto(self, url: str, **kwargs):
         """Navigate to URL using Playwright directly"""
-        return await self.page.goto(url, **kwargs)
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            return await self.page.goto(url, **kwargs)
 
     async def navigate(
         self, 
@@ -41,8 +43,11 @@ class StagehandPage:
         payload = {"url": url}
         if options:
             payload["options"] = options
-            
-        return await self._stagehand._execute("navigate", payload)
+
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("navigate", payload)
+        return result
     
     async def act(
         self, 
@@ -65,7 +70,10 @@ class StagehandPage:
         if variables is not None:
             payload["variables"] = variables
             
-        return await self._stagehand._execute("act", payload)
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("act", payload)
+        return result
         
     async def observe(
         self,
@@ -89,7 +97,10 @@ class StagehandPage:
         if use_accessibility_tree is not None:
             payload["useAccessibilityTree"] = use_accessibility_tree
             
-        return await self._stagehand._execute("observe", payload)
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("observe", payload)
+        return result
         
     async def extract(
         self,
@@ -125,8 +136,12 @@ class StagehandPage:
             
         payload.update(kwargs)
         
-        return await self._stagehand._execute("extract", payload)
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("extract", payload)
+        return result
 
     # Forward other Page methods to underlying Playwright page
+    # TODO - add a lock for all page actions?
     def __getattr__(self, name):
         return getattr(self.page, name)

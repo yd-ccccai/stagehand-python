@@ -23,6 +23,9 @@ class Stagehand:
     which will be sent to the server if a new session is created.
     """
 
+    # Dictionary to store one lock per session_id
+    _session_locks = {}
+
     def __init__(
         self,
         server_url: Optional[str] = None,
@@ -70,6 +73,7 @@ class Stagehand:
             write=90.0,    # write timeout
             pool=90.0,     # pool timeout
         )
+        self.streamed_response = True  # Default to True for streamed responses
 
         self._client: Optional[httpx.AsyncClient] = None
         self._playwright = None
@@ -87,6 +91,15 @@ class Stagehand:
                 raise ValueError("browserbase_api_key is required (or set BROWSERBASE_API_KEY in env).")
             if not self.browserbase_project_id:
                 raise ValueError("browserbase_project_id is required (or set BROWSERBASE_PROJECT_ID in env).")
+
+    def _get_lock_for_session(self) -> asyncio.Lock:
+        """
+        Return an asyncio.Lock for this session. If one doesn't exist yet, create it.
+        """
+        if self.session_id not in self._session_locks:
+            self._session_locks[self.session_id] = asyncio.Lock()
+            print(f"Created lock for session {self.session_id}")
+        return self._session_locks[self.session_id]
 
     async def __aenter__(self):
         self._log("Entering Stagehand context manager (__aenter__)...", level=1)
@@ -145,6 +158,7 @@ class Stagehand:
         existing_pages = self._context.pages
         self._log(f"Existing pages: {len(existing_pages)}", level=1)
         if existing_pages:
+            self._log("Using existing page", level=1)
             self._playwright_page = existing_pages[0]
         else:
             self._log("Creating a new page...", level=1)
@@ -194,7 +208,7 @@ class Stagehand:
 
     async def _check_server_health(self, timeout: int = 10):
         """
-        Ping /api/healthcheck to verify the server is available.
+        Ping /healthcheck to verify the server is available.
         Uses exponential backoff for retries.
         """
         start = time.time()
@@ -203,10 +217,13 @@ class Stagehand:
             try:
                 client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
                 async with client:
-                    resp = await client.get(f"{self.server_url}/api/healthcheck")
+                    headers = {
+                        "x-bb-api-key": self.browserbase_api_key,
+                    }
+                    resp = await client.get(f"{self.server_url}/healthcheck", headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
-                        if data.get("status") == "ok":
+                        if data.get("success") is True:
                             self._log("Healthcheck passed. Server is running.", level=1)
                             return
             except Exception as e:
@@ -218,10 +235,9 @@ class Stagehand:
             wait_time = min(2 ** attempt * 0.5, 5.0)  # Exponential backoff, capped at 5 seconds
             await asyncio.sleep(wait_time)
             attempt += 1
-
     async def _create_session(self):
         """
-        Create a new session by calling /api/start-session on the server.
+        Create a new session by calling /sessions/start on the server.
         Depends on browserbase_api_key, browserbase_project_id, and openai_api_key.
         """
         if not self.browserbase_api_key:
@@ -239,50 +255,49 @@ class Stagehand:
         }
 
         headers = {
-            "browserbase-api-key": self.browserbase_api_key,
-            "browserbase-project-id": self.browserbase_project_id,
-            "model-api-key": self.openai_api_key,
+            "x-bb-api-key": self.browserbase_api_key,
+            "x-bb-project-id": self.browserbase_project_id,
+            "x-model-api-key": self.openai_api_key,
             "Content-Type": "application/json",
         }
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         async with client:
             resp = await client.post(
-                f"{self.server_url}/api/start-session",
+                f"{self.server_url}/sessions/start",
                 json=payload,
                 headers=headers,
             )
             if resp.status_code != 200:
                 raise RuntimeError(f"Failed to create session: {resp.text}")
             data = resp.json()
-            if "sessionId" not in data:
-                raise RuntimeError(f"Missing sessionId in response: {resp.text}")
+            self._log(f"Session created: {data}", level=1)
+            if not data.get("success") or "sessionId" not in data.get("data", {}):
+                raise RuntimeError(f"Invalid response format: {resp.text}")
 
-            self.session_id = data["sessionId"]
-    
+            self.session_id = data["data"]["sessionId"]
+
     async def _execute(self, method: str, payload: Dict[str, Any]) -> Any:
         """
-        Internal helper to call /api/execute with the given method and payload.
+        Internal helper to call /sessions/{session_id}/{method} with the given method and payload.
         Streams line-by-line, returning the 'result' from the final message (if any).
         """
-
         headers = {
-            "browserbase-session-id": self.session_id,
-            "browserbase-api-key": self.browserbase_api_key,
-            "browserbase-project-id": self.browserbase_project_id,
+            "x-bb-api-key": self.browserbase_api_key,
+            "x-bb-project-id": self.browserbase_project_id,
             "Content-Type": "application/json",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
+            "x-streamed-response": str(self.streamed_response).lower()
         }
         if self.openai_api_key:
-            headers["openai-api-key"] = self.openai_api_key
+            headers["x-model-api-key"] = self.openai_api_key
 
-        # We'll collect final_result from the 'finished' system message
-        final_result = None
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
+
         async with client:
             async with client.stream(
                 "POST", 
-                f"{self.server_url}/api/{method}",
+                f"{self.server_url}/sessions/{self.session_id}/{method}",
                 json=payload,
                 headers=headers,
             ) as response:
@@ -310,8 +325,7 @@ class Stagehand:
                         if msg_type == "system":
                             status = message.get("data", {}).get("status")
                             if status == "finished":
-                                final_result = message.get("data", {}).get("result")
-                                return final_result
+                                return message.get("data", {}).get("result")
                         elif msg_type == "log":
                             # Log message from data.message
                             log_msg = message.get("data", {}).get("message", "")
@@ -328,7 +342,8 @@ class Stagehand:
                         self._log(f"Could not parse line as JSON: {line}", level=2)
                         continue
 
-        return final_result
+        # If we get here without seeing a "finished" message, something went wrong
+        raise RuntimeError("Server connection closed without sending 'finished' message")
 
     async def _handle_log(self, msg: Dict[str, Any]):
         """
