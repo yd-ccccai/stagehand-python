@@ -12,7 +12,7 @@ async def main():
         server_url=os.getenv("SERVER_URL"),
         browserbase_api_key=os.getenv("BROWSERBASE_API_KEY"),
         browserbase_project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        model_api_key=os.getenv("OPENAI_API_KEY"),
         verbose=2,
         model_name="gpt-4o-mini",  # optional - defaults to server's default
         debug_dom=True,  # optional - defaults to server's default
@@ -29,9 +29,15 @@ async def main():
 
         # # Make observations about the site
         activity = await stagehand.page.observe(
-            use_accessibility_tree=True  # Use accessibility tree faster DOM parsing
+            instruction="find all the links on the page regarding the city of el paso",
+            only_visible=True  # Use accessibility tree faster DOM parsing
         )
         print("\nObservations:", activity)
+        print("Length of observations:", len(activity))
+
+        print("Click on the first extracted element")
+        print(activity[0])
+        await stagehand.page.click(activity[0]["selector"])
 
     except Exception as e:
         print(f"Error: {e}")
