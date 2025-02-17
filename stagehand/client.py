@@ -244,7 +244,7 @@ class Stagehand:
                     resp = await client.get(f"{self.server_url}/healthcheck", headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
-                        if data.get("success") is True:
+                        if data.get("status") == "ok":
                             self._log("Healthcheck passed. Server is running.", level=1)
                             return
             except Exception as e:

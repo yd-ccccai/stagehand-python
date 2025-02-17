@@ -30,7 +30,7 @@ async def main():
         )
 
         # Create a Stagehand client using the configuration object.
-        stagehand = Stagehand(config=config, server_url=os.getenv("SERVER_URL"), verbose=2)
+        stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2)
 
         # Initialize - this creates a new session automatically.
         await stagehand.init()
