@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="stagehand-py",
-    version="0.1.8",
+    version="0.1.9",
     author="Browserbase, Inc.",
     author_email="support@browserbase.io",
     description="Python SDK for Stagehand",
@@ -24,5 +24,6 @@ setup(
         "asyncio>=3.4.3",
         "python-dotenv>=1.0.0",
         "pydantic>=1.10.0",
+        "playwright>=1.40.0",
     ],
 ) 

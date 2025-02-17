@@ -230,6 +230,7 @@ config = StagehandConfig(
 - asyncio
 - pydantic
 - python-dotenv (optional, for .env support)
+- playwright
 
 ## License
 
