@@ -65,9 +65,7 @@ class Stagehand:
         if config:
             self.browserbase_api_key = config.api_key or browserbase_api_key or os.getenv("BROWSERBASE_API_KEY")
             self.browserbase_project_id = config.project_id or browserbase_project_id or os.getenv("BROWSERBASE_PROJECT_ID")
-            self.model_api_key = model_api_key or (
-                config.model_client_options.get("apiKey") if config.model_client_options else None
-            ) or os.getenv("MODEL_API_KEY")
+            self.model_api_key = os.getenv("MODEL_API_KEY")
             self.session_id = config.browserbase_session_id or session_id
             self.model_name = config.model_name or model_name
             self.dom_settle_timeout_ms = config.dom_settle_timeout_ms or dom_settle_timeout_ms
@@ -200,20 +198,38 @@ class Stagehand:
             return
 
         self._log("Closing resources...", level=1)
-        if self._playwright_page:
-            self._log("Closing the Playwright page...", level=1)
-            await self._playwright_page.close()
-            self._playwright_page = None
+        
+        # End the session on the server if we have a session ID
+        if self.session_id:
+            try:
+                self._log(f"Ending session {self.session_id} on the server...", level=1)
+                client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
+                headers = {
+                    "x-bb-api-key": self.browserbase_api_key,
+                    "x-bb-project-id": self.browserbase_project_id,
+                    "Content-Type": "application/json",
+                }
+                
+                async with client:
+                    await self._execute("end", {"sessionId": self.session_id})
+                    self._log(f"Session {self.session_id} ended successfully", level=1)
+            except Exception as e:
+                self._log(f"Error ending session: {str(e)}", level=2)
+        
+        # if self._playwright_page:
+        #     self._log("Closing the Playwright page...", level=1)
+        #     await self._playwright_page.close()
+        #     self._playwright_page = None
 
-        if self._context:
-            self._log("Closing the context...", level=1)
-            await self._context.close()
-            self._context = None
+        # if self._context:
+        #     self._log("Closing the context...", level=1)
+        #     await self._context.close()
+        #     self._context = None
 
-        if self._browser:
-            self._log("Closing the browser...", level=1)
-            await self._browser.close()
-            self._browser = None
+        # if self._browser:
+        #     self._log("Closing the browser...", level=1)
+        #     await self._browser.close()
+        #     self._browser = None
 
         if self._playwright:
             self._log("Stopping Playwright...", level=1)
@@ -315,56 +331,76 @@ class Stagehand:
             headers["x-model-api-key"] = self.model_api_key
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
-        print(f"Executing {method} with payload: {payload} and headers: {headers}")
+        print(f"\n==== EXECUTING {method.upper()} ====")
+        print(f"URL: {self.server_url}/sessions/{self.session_id}/{method}")
+        print(f"Payload: {payload}")
+        print(f"Headers: {headers}")
+        
         async with client:
-            async with client.stream(
-                "POST", 
-                f"{self.server_url}/sessions/{self.session_id}/{method}",
-                json=payload,
-                headers=headers,
-            ) as response:
-                if response.status_code != 200:
-                    error_text = await response.aread()
-                    self._log(f"Error: {error_text.decode('utf-8')}", level=2)
-                    return None
+            try:
+                async with client.stream(
+                    "POST", 
+                    f"{self.server_url}/sessions/{self.session_id}/{method}",
+                    json=payload,
+                    headers=headers,
+                ) as response:
+                    print(f"Response status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        error_message = error_text.decode('utf-8')
+                        print(f"ERROR RESPONSE: {error_message}")
+                        self._log(f"Error: {error_message}", level=2)
+                        return None
 
-                async for line in response.aiter_lines():
-                    # Skip empty lines
-                    if not line.strip():
-                        continue
+                    print("Starting to process streaming response...")
+                    async for line in response.aiter_lines():
+                        # Skip empty lines
+                        if not line.strip():
+                            continue
 
-                    try:
-                        # Handle SSE-style messages that start with "data: "
-                        if line.startswith("data: "):
-                            line = line[len("data: "):]
-                        
-                        message = json.loads(line)
-                        logger.info(f"Message: {message}")
-                        
-                        # Handle different message types
-                        msg_type = message.get("type")
-                        
-                        if msg_type == "system":
-                            status = message.get("data", {}).get("status")
-                            if status == "finished":
-                                return message.get("data", {}).get("result")
-                        elif msg_type == "log":
-                            # Log message from data.message
-                            log_msg = message.get("data", {}).get("message", "")
-                            self._log(log_msg, level=1)
-                            if self.on_log:
-                                await self.on_log(message)
-                        else:
-                            # Log any other message types
-                            self._log(f"Unknown message type: {msg_type}", level=2)
-                            if self.on_log:
-                                await self.on_log(message)
+                        try:
+                            # Handle SSE-style messages that start with "data: "
+                            if line.startswith("data: "):
+                                line = line[len("data: "):]
+                            
+                            message = json.loads(line)
+                            print(f"RAW MESSAGE: {message}")
+                            
+                            # Handle different message types
+                            msg_type = message.get("type")
+                            
+                            if msg_type == "system":
+                                status = message.get("data", {}).get("status")
+                                if status == "finished":
+                                    result = message.get("data", {}).get("result")
+                                    print(f"FINISHED WITH RESULT: {result}")
+                                    print(f"==== {method.upper()} COMPLETE ====\n")
+                                    return result
+                            elif msg_type == "log":
+                                # Log message from data.message
+                                log_msg = message.get("data", {}).get("message", "")
+                                print(f"LOG MESSAGE: {log_msg}")
+                                self._log(log_msg, level=1)
+                                if self.on_log:
+                                    await self.on_log(message)
+                            else:
+                                # Log any other message types
+                                print(f"UNKNOWN MESSAGE TYPE: {msg_type}")
+                                self._log(f"Unknown message type: {msg_type}", level=2)
+                                if self.on_log:
+                                    await self.on_log(message)
 
-                    except json.JSONDecodeError:
-                        self._log(f"Could not parse line as JSON: {line}", level=2)
-                        continue
+                        except json.JSONDecodeError:
+                            print(f"JSON DECODE ERROR on line: {line}")
+                            self._log(f"Could not parse line as JSON: {line}", level=2)
+                            continue
+            except Exception as e:
+                print(f"EXCEPTION IN _EXECUTE: {str(e)}")
+                raise
 
         # If we get here without seeing a "finished" message, something went wrong
+        print("==== ERROR: No 'finished' message received ====")
         raise RuntimeError("Server connection closed without sending 'finished' message")
 
     async def _handle_log(self, msg: Dict[str, Any]):

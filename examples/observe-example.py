@@ -11,13 +11,12 @@ load_dotenv()
 async def main():
     # Build a unified Stagehand configuration object
     config = StagehandConfig(
-        env="BROWSERBASE" if os.getenv("BROWSERBASE_API_KEY") and os.getenv("BROWSERBASE_PROJECT_ID") else "LOCAL",
+        env="BROWSERBASE",
         api_key=os.getenv("BROWSERBASE_API_KEY"),
         project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
         debug_dom=True,
         headless=True,
         model_name="gpt-4o-mini",
-        model_client_options={"apiKey": os.getenv("MODEL_API_KEY")}
     )
 
     # Create a Stagehand client using the configuration object.
@@ -35,7 +34,6 @@ async def main():
         # Use ObserveOptions for detailed instructions
         options = ObserveOptions(
             instruction="find all the links on the page regarding the city of el paso",
-            only_visible=True
         )
         activity = await stagehand.page.observe(options)
         print("\nObservations:", activity)

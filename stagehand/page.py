@@ -1,9 +1,7 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Any, Union, List
 from playwright.async_api import Page
-from pydantic import BaseModel
-
-# (Make sure to import the new options models when needed)
-from .schemas import ActOptions, ObserveOptions, ExtractOptions
+from .schemas import ActOptions, ObserveOptions, ExtractOptions, ObserveResult, ActResult, ExtractResult
+from pprint import pprint
 
 class StagehandPage:
     """Wrapper around Playwright Page that integrates with Stagehand server"""
@@ -71,41 +69,68 @@ class StagehandPage:
             result = await self._stagehand._execute("navigate", payload)
         return result
     
-    async def act(self, options: ActOptions) -> Any:
+    async def act(self, options: Union[str, ActOptions, ObserveResult]) -> ActResult:
         """
         Execute an AI action via the Stagehand server.
         
         Args:
-            options (ActOptions): A Pydantic model encapsulating the action.
+            options (Union[str, ActOptions]): Either a string with the action command or
+                a Pydantic model encapsulating the action.
                 See `stagehand.schemas.ActOptions` for details on expected fields.
             
         Returns:
             Any: The result from the Stagehand server's action execution.
         """
-        payload = options.dict(exclude_none=True)
+        # Convert string to ActOptions if needed
+        if isinstance(options, str):
+            options = ActOptions(action=options)
+            
+        payload = options.model_dump(exclude_none=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("act", payload)
+        if isinstance(result, dict):
+            return ActResult(**result)
         return result
         
-    async def observe(self, options: ObserveOptions) -> Any:
+    
+    async def observe(self, options: Union[str, ObserveOptions]) -> List[ObserveResult]:
         """
         Make an AI observation via the Stagehand server.
         
         Args:
-            options (ObserveOptions): A Pydantic model encapsulating the observation instruction.
+            options (Union[str, ObserveOptions]): Either a string with the observation instruction
+                or a Pydantic model encapsulating the observation instruction.
                 See `stagehand.schemas.ObserveOptions` for details on expected fields.
             
         Returns:
-            Any: The result from the Stagehand server's observation execution.
+            List[ObserveResult]: A list of observation results from the Stagehand server.
         """
-        payload = options.dict(exclude_none=True)
+        # Convert string to ObserveOptions if needed
+        if isinstance(options, str):
+            options = ObserveOptions(instruction=options)
+            
+        payload = options.model_dump(exclude_none=True)
         lock = self._stagehand._get_lock_for_session()
+        print("\n\n==== OBSERVE METHOD CALLED ====")
+        print(f"Payload: {payload}")
         async with lock:
+            print("About to execute observe command...")
             result = await self._stagehand._execute("observe", payload)
-        return result
+            print("Observe command execution completed")
+        print(f"OBSERVE RESULT:\n")
+        pprint(result)
+        print(f"OBSERVE RESULT TYPE: {type(result)}")
+        print("==== OBSERVE METHOD FINISHING ====\n\n")
+        # Convert raw result to list of ObserveResult models
+        if isinstance(result, list):
+            return [ObserveResult(**item) for item in result]
+        elif isinstance(result, dict):
+            # If single dict, wrap in list
+            return [ObserveResult(**result)]
+        return []
         
-    async def extract(self, options: ExtractOptions) -> Any:
+    async def extract(self, options: Union[str, ExtractOptions]) -> ExtractResult:
         """
         Extract data using AI via the Stagehand server.
         
@@ -119,10 +144,16 @@ class StagehandPage:
         Returns:
             Any: The result from the Stagehand server's extraction execution.
         """
-        payload = options.dict(exclude_none=True)
+        # Convert string to ExtractOptions if needed
+        if isinstance(options, str):
+            options = ExtractOptions(instruction=options)
+            
+        payload = options.model_dump(exclude_none=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("extract", payload)
+        if isinstance(result, dict):
+            return ExtractResult(**result)
         return result
 
     # Forward other Page methods to underlying Playwright page

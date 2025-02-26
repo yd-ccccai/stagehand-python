@@ -1,5 +1,24 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, Union, Type
+from typing import Optional, Dict, Any, Union, Type, List
+from enum import Enum
+
+# Default extraction schema that matches the TypeScript version
+DEFAULT_EXTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "extraction": {
+            "type": "string"
+        }
+    },
+    "required": ["extraction"]
+}
+
+class AvailableModel(str, Enum):
+    GPT_4O = "gpt-4o"
+    GPT_4O_MINI = "gpt-4o-mini"
+    CLAUDE_3_5_SONNET_LATEST = "claude-3-5-sonnet-latest"
+    CLAUDE_3_7_SONNET_LATEST = "claude-3-7-sonnet-latest"
+    
 
 class ActOptions(BaseModel):
     """
@@ -7,25 +26,28 @@ class ActOptions(BaseModel):
 
     Attributes:
         action (str): The action command to be executed by the AI.
-        useVision: Optional[Union[bool, str]] = None
         variables: Optional[Dict[str, str]] = None
+        modelName: Optional[AvailableModel] = None 
+        slowDomBasedAct: Optional[bool] = None
     """
     action: str = Field(..., description="The action command to be executed by the AI.")
-    useVision: Optional[Union[bool, str]] = None
     variables: Optional[Dict[str, str]] = None
+    modelName: Optional[AvailableModel] = None 
+    slowDomBasedAct: Optional[bool] = None
 
-class ObserveOptions(BaseModel):
+class ActResult(BaseModel):
     """
-    Options for the 'observe' command.
+    Result of the 'act' command.
 
     Attributes:
-        instruction (str): Instruction detailing what the AI should observe.
-        useVision: Optional[bool] = None
-        onlyVisible: Optional[bool] = None
+        success (bool): Whether the action was successful.
+        message (str): Message from the AI about the action.
+        action (str): The action command that was executed.
     """
-    instruction: str = Field(..., description="Instruction detailing what the AI should observe.")
-    useVision: Optional[bool] = None
-    onlyVisible: Optional[bool] = None
+    success: bool = Field(..., description="Whether the action was successful.")
+    message: str = Field(..., description="Message from the AI about the action.")
+    action: str = Field(..., description="The action command that was executed.")
+
 
 class ExtractOptions(BaseModel):
     """
@@ -33,18 +55,76 @@ class ExtractOptions(BaseModel):
 
     Attributes:
         instruction (str): Instruction specifying what data to extract using AI.
+        modelName: Optional[AvailableModel] = None
+        selector: Optional[str] = None
         schemaDefinition (Union[Dict[str, Any], Type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
             Note: If passing a Pydantic model, invoke its .model_json_schema() method to ensure the schema is JSON serializable.
         useTextExtract: Optional[bool] = None
     """
     instruction: str = Field(..., description="Instruction specifying what data to extract using AI.")
+    modelName: Optional[AvailableModel] = None
+    selector: Optional[str] = None
     # IMPORTANT: If using a Pydantic model for schemaDefinition, please call its .model_json_schema() method
     # to convert it to a JSON serializable dictionary before sending it with the extract command.
     schemaDefinition: Union[Dict[str, Any], Type[BaseModel]] = Field(
-        None, 
+        default=DEFAULT_EXTRACT_SCHEMA, 
         description="A JSON schema or Pydantic model that defines the structure of the expected data."
     )
-    useTextExtract: Optional[bool] = None
+    useTextExtract: Optional[bool] = True
 
     class Config:
         arbitrary_types_allowed = True 
+
+class ExtractResult(BaseModel):
+    """
+    Result of the 'extract' command.
+    
+    This is a generic model to hold extraction results of different types.
+    The actual fields will depend on the schema provided in ExtractOptions.
+    """
+    # This class is intentionally left without fields so it can accept 
+    # any fields from the extraction result based on the schema
+    
+    class Config:
+        extra = "allow"  # Allow any extra fields
+
+    def __getitem__(self, key):
+        """
+        Enable dictionary-style access to attributes.
+        This allows usage like result["selector"] in addition to result.selector
+        """
+        return getattr(self, key)
+
+class ObserveOptions(BaseModel):
+    """
+    Options for the 'observe' command.
+
+    Attributes:
+        instruction (str): Instruction detailing what the AI should observe.
+        modelName: Optional[AvailableModel] = None
+        onlyVisible: Optional[bool] = None
+        returnAction: Optional[bool] = None
+        drawOverlay: Optional[bool] = None
+    """
+    instruction: str = Field(..., description="Instruction detailing what the AI should observe.")
+    onlyVisible: Optional[bool] = False
+    modelName: Optional[AvailableModel] = None
+    returnAction: Optional[bool] = None
+    drawOverlay: Optional[bool] = None
+
+class ObserveResult(BaseModel):
+    """
+    Result of the 'observe' command.
+    """
+    selector: str = Field(..., description="The selector of the observed element.")
+    description: str = Field(..., description="The description of the observed element.")
+    backendNodeId: Optional[int] = None
+    method: Optional[str] = None
+    arguments: Optional[List[str]] = None
+    
+    def __getitem__(self, key):
+        """
+        Enable dictionary-style access to attributes.
+        This allows usage like result["selector"] in addition to result.selector
+        """
+        return getattr(self, key)

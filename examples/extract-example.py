@@ -36,13 +36,14 @@ async def main():
         print("Navigation complete.")
 
         # Use the ExtractOptions Pydantic model to pass instruction and schema definition
+        print(ExtractSchema.model_json_schema())
         data = await stagehand.page.extract(
             ExtractOptions(
                 instruction="Extract the number of stars for the project",
                 schemaDefinition=ExtractSchema.model_json_schema()
             )
         )
-        print("\nExtracted stars:", data)
+        print("\nExtracted stars:", data["stars"])
 
     except Exception as e:
         print(f"Error: {e}")
