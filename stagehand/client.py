@@ -1,24 +1,28 @@
 import asyncio
 import json
-import time
-import httpx
-import os
 import logging
-from typing import Optional, Dict, Any, Callable, Awaitable
+import os
+import time
+from collections.abc import Awaitable
+from typing import Any, Callable, Dict, Optional
+
+import httpx
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
+
+from .config import StagehandConfig
 from .page import StagehandPage
 from .utils import default_log_handler
-from .config import StagehandConfig
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class Stagehand:
     """
     Python client for interacting with a running Stagehand server and Browserbase remote headless browser.
-    
+
     Now supports automatically creating a new session if no session_id is provided.
     You can also optionally provide a configuration via the 'config' parameter to centralize all parameters.
     """
@@ -34,7 +38,9 @@ class Stagehand:
         browserbase_api_key: Optional[str] = None,
         browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = default_log_handler,
+        on_log: Optional[
+            Callable[[Dict[str, Any]], Awaitable[None]]
+        ] = default_log_handler,
         verbose: int = 1,
         model_name: Optional[str] = None,
         dom_settle_timeout_ms: Optional[int] = None,
@@ -63,22 +69,36 @@ class Stagehand:
         self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
 
         if config:
-            self.browserbase_api_key = config.api_key or browserbase_api_key or os.getenv("BROWSERBASE_API_KEY")
-            self.browserbase_project_id = config.project_id or browserbase_project_id or os.getenv("BROWSERBASE_PROJECT_ID")
-            self.model_api_key = model_api_key or (
-                config.model_client_options.get("apiKey") if config.model_client_options else None
-            ) or os.getenv("MODEL_API_KEY")
+            self.browserbase_api_key = (
+                config.api_key
+                or browserbase_api_key
+                or os.getenv("BROWSERBASE_API_KEY")
+            )
+            self.browserbase_project_id = (
+                config.project_id
+                or browserbase_project_id
+                or os.getenv("BROWSERBASE_PROJECT_ID")
+            )
+            self.model_api_key = os.getenv("MODEL_API_KEY")
             self.session_id = config.browserbase_session_id or session_id
             self.model_name = config.model_name or model_name
-            self.dom_settle_timeout_ms = config.dom_settle_timeout_ms or dom_settle_timeout_ms
-            self.debug_dom = config.debug_dom if config.debug_dom is not None else debug_dom
+            self.dom_settle_timeout_ms = (
+                config.dom_settle_timeout_ms or dom_settle_timeout_ms
+            )
+            self.debug_dom = (
+                config.debug_dom if config.debug_dom is not None else debug_dom
+            )
             self._custom_logger = config.logger  # For future integration if needed
             # Additional config parameters available for future use:
             self.headless = config.headless
             self.enable_caching = config.enable_caching
         else:
-            self.browserbase_api_key = browserbase_api_key or os.getenv("BROWSERBASE_API_KEY")
-            self.browserbase_project_id = browserbase_project_id or os.getenv("BROWSERBASE_PROJECT_ID")
+            self.browserbase_api_key = browserbase_api_key or os.getenv(
+                "BROWSERBASE_API_KEY"
+            )
+            self.browserbase_project_id = browserbase_project_id or os.getenv(
+                "BROWSERBASE_PROJECT_ID"
+            )
             self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
             self.session_id = session_id
             self.model_name = model_name
@@ -104,32 +124,36 @@ class Stagehand:
         self.page: Optional[StagehandPage] = None
 
         self._initialized = False  # Flag to track if init() has run
-        self._closed = False       # Flag to track if resources have been closed
+        self._closed = False  # Flag to track if resources have been closed
 
         # Validate essential fields if session_id was provided
         if self.session_id:
             if not self.browserbase_api_key:
-                raise ValueError("browserbase_api_key is required (or set BROWSERBASE_API_KEY in env).")
+                raise ValueError(
+                    "browserbase_api_key is required (or set BROWSERBASE_API_KEY in env)."
+                )
             if not self.browserbase_project_id:
-                raise ValueError("browserbase_project_id is required (or set BROWSERBASE_PROJECT_ID in env).")
-                
+                raise ValueError(
+                    "browserbase_project_id is required (or set BROWSERBASE_PROJECT_ID in env)."
+                )
+
     def _get_lock_for_session(self) -> asyncio.Lock:
         """
         Return an asyncio.Lock for this session. If one doesn't exist yet, create it.
         """
         if self.session_id not in self._session_locks:
             self._session_locks[self.session_id] = asyncio.Lock()
-            print(f"Created lock for session {self.session_id}")
+            self._log(f"Created lock for session {self.session_id}", level=3)
         return self._session_locks[self.session_id]
 
     async def __aenter__(self):
-        self._log("Entering Stagehand context manager (__aenter__)...", level=1)
+        self._log("Entering Stagehand context manager (__aenter__)...", level=3)
         # Just call init() if not already done
         await self.init()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self._log("Exiting Stagehand context manager (__aexit__)...", level=1)
+        self._log("Exiting Stagehand context manager (__aexit__)...", level=3)
         await self.close()
 
     async def init(self):
@@ -138,13 +162,15 @@ class Stagehand:
         Creates or resumes the session, starts Playwright, and sets up self.page.
         """
         if self._initialized:
-            self._log("Stagehand is already initialized; skipping init()", level=2)
+            self._log("Stagehand is already initialized; skipping init()", level=3)
             return
 
-        self._log("Initializing Stagehand...", level=1)
+        self._log("Initializing Stagehand...", level=3)
 
         if not self._client:
-            self._client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
+            self._client = self.httpx_client or httpx.AsyncClient(
+                timeout=self.timeout_settings
+            )
 
         # Check server health
         await self._check_server_health()
@@ -152,41 +178,41 @@ class Stagehand:
         # Create session if we don't have one
         if not self.session_id:
             await self._create_session()
-            self._log(f"Created new session: {self.session_id}", level=1)
+            self._log(f"Created new session: {self.session_id}", level=3)
 
         # Start Playwright and connect to remote
-        self._log("Starting Playwright...", level=1)
+        self._log("Starting Playwright...", level=3)
         self._playwright = await async_playwright().start()
 
         connect_url = (
             f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
             f"&sessionId={self.session_id}"
         )
-        self._log(f"Connecting to remote browser at: {connect_url}", level=1)
+        self._log(f"Connecting to remote browser at: {connect_url}", level=3)
         self._browser = await self._playwright.chromium.connect_over_cdp(connect_url)
-        self._log(f"Connected to remote browser: {self._browser}", level=1)
-        
+        self._log(f"Connected to remote browser: {self._browser}", level=3)
+
         # Access or create a context
         existing_contexts = self._browser.contexts
-        self._log(f"Existing contexts: {len(existing_contexts)}", level=1)
+        self._log(f"Existing contexts: {len(existing_contexts)}", level=3)
         if existing_contexts:
             self._context = existing_contexts[0]
         else:
-            self._log("Creating a new context...", level=1)
+            self._log("Creating a new context...", level=3)
             self._context = await self._browser.new_context()
 
         # Access or create a page
         existing_pages = self._context.pages
-        self._log(f"Existing pages: {len(existing_pages)}", level=1)
+        self._log(f"Existing pages: {len(existing_pages)}", level=3)
         if existing_pages:
-            self._log("Using existing page", level=1)
+            self._log("Using existing page", level=3)
             self._playwright_page = existing_pages[0]
         else:
-            self._log("Creating a new page...", level=1)
+            self._log("Creating a new page...", level=3)
             self._playwright_page = await self._context.new_page()
 
         # Wrap with StagehandPage
-        self._log("Wrapping Playwright page in StagehandPage", level=1)
+        self._log("Wrapping Playwright page in StagehandPage", level=3)
         self.page = StagehandPage(self._playwright_page, self)
 
         self._initialized = True
@@ -199,29 +225,34 @@ class Stagehand:
             # Already closed
             return
 
-        self._log("Closing resources...", level=1)
-        if self._playwright_page:
-            self._log("Closing the Playwright page...", level=1)
-            await self._playwright_page.close()
-            self._playwright_page = None
+        self._log("Closing resources...", level=3)
 
-        if self._context:
-            self._log("Closing the context...", level=1)
-            await self._context.close()
-            self._context = None
+        # End the session on the server if we have a session ID
+        if self.session_id:
+            try:
+                self._log(f"Ending session {self.session_id} on the server...", level=3)
+                client = self.httpx_client or httpx.AsyncClient(
+                    timeout=self.timeout_settings
+                )
+                headers = {
+                    "x-bb-api-key": self.browserbase_api_key,
+                    "x-bb-project-id": self.browserbase_project_id,
+                    "Content-Type": "application/json",
+                }
 
-        if self._browser:
-            self._log("Closing the browser...", level=1)
-            await self._browser.close()
-            self._browser = None
+                async with client:
+                    await self._execute("end", {"sessionId": self.session_id})
+                    self._log(f"Session {self.session_id} ended successfully", level=3)
+            except Exception as e:
+                self._log(f"Error ending session: {str(e)}", level=3)
 
         if self._playwright:
-            self._log("Stopping Playwright...", level=1)
+            self._log("Stopping Playwright...", level=3)
             await self._playwright.stop()
             self._playwright = None
 
         if self._client and not self.httpx_client:
-            self._log("Closing the internal HTTPX client...", level=1)
+            self._log("Closing the internal HTTPX client...", level=3)
             await self._client.aclose()
             self._client = None
 
@@ -236,24 +267,30 @@ class Stagehand:
         attempt = 0
         while True:
             try:
-                client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
+                client = self.httpx_client or httpx.AsyncClient(
+                    timeout=self.timeout_settings
+                )
                 async with client:
                     headers = {
                         "x-bb-api-key": self.browserbase_api_key,
                     }
-                    resp = await client.get(f"{self.server_url}/healthcheck", headers=headers)
+                    resp = await client.get(
+                        f"{self.server_url}/healthcheck", headers=headers
+                    )
                     if resp.status_code == 200:
                         data = resp.json()
                         if data.get("status") == "ok":
-                            self._log("Healthcheck passed. Server is running.", level=1)
+                            self._log("Healthcheck passed. Server is running.", level=3)
                             return
             except Exception as e:
-                self._log(f"Healthcheck error: {str(e)}", level=2)
+                self._log(f"Healthcheck error: {str(e)}", level=3)
 
             if time.time() - start > timeout:
                 raise TimeoutError(f"Server not responding after {timeout} seconds.")
-                
-            wait_time = min(2 ** attempt * 0.5, 5.0)  # Exponential backoff, capped at 5 seconds
+
+            wait_time = min(
+                2**attempt * 0.5, 5.0
+            )  # Exponential backoff, capped at 5 seconds
             await asyncio.sleep(wait_time)
             attempt += 1
 
@@ -293,7 +330,7 @@ class Stagehand:
             if resp.status_code != 200:
                 raise RuntimeError(f"Failed to create session: {resp.text}")
             data = resp.json()
-            self._log(f"Session created: {data}", level=1)
+            self._log(f"Session created: {data}", level=3)
             if not data.get("success") or "sessionId" not in data.get("data", {}):
                 raise RuntimeError(f"Invalid response format: {resp.text}")
 
@@ -309,75 +346,92 @@ class Stagehand:
             "x-bb-project-id": self.browserbase_project_id,
             "Content-Type": "application/json",
             "Connection": "keep-alive",
-            "x-stream-response": str(self.streamed_response).lower()
+            "x-stream-response": str(self.streamed_response).lower(),
         }
         if self.model_api_key:
             headers["x-model-api-key"] = self.model_api_key
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
-        print(f"Executing {method} with payload: {payload} and headers: {headers}")
+        self._log(f"\n==== EXECUTING {method.upper()} ====", level=3)
+        self._log(
+            f"URL: {self.server_url}/sessions/{self.session_id}/{method}", level=3
+        )
+        self._log(f"Payload: {payload}", level=3)
+        self._log(f"Headers: {headers}", level=3)
+
         async with client:
-            async with client.stream(
-                "POST", 
-                f"{self.server_url}/sessions/{self.session_id}/{method}",
-                json=payload,
-                headers=headers,
-            ) as response:
-                if response.status_code != 200:
-                    error_text = await response.aread()
-                    self._log(f"Error: {error_text.decode('utf-8')}", level=2)
-                    return None
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{self.server_url}/sessions/{self.session_id}/{method}",
+                    json=payload,
+                    headers=headers,
+                ) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        error_message = error_text.decode("utf-8")
+                        self._log(f"Error: {error_message}", level=3)
+                        return None
 
-                async for line in response.aiter_lines():
-                    # Skip empty lines
-                    if not line.strip():
-                        continue
+                    self._log("Starting to process streaming response...", level=3)
+                    async for line in response.aiter_lines():
+                        # Skip empty lines
+                        if not line.strip():
+                            continue
 
-                    try:
-                        # Handle SSE-style messages that start with "data: "
-                        if line.startswith("data: "):
-                            line = line[len("data: "):]
-                        
-                        message = json.loads(line)
-                        logger.info(f"Message: {message}")
-                        
-                        # Handle different message types
-                        msg_type = message.get("type")
-                        
-                        if msg_type == "system":
-                            status = message.get("data", {}).get("status")
-                            if status == "finished":
-                                return message.get("data", {}).get("result")
-                        elif msg_type == "log":
-                            # Log message from data.message
-                            log_msg = message.get("data", {}).get("message", "")
-                            self._log(log_msg, level=1)
-                            if self.on_log:
-                                await self.on_log(message)
-                        else:
-                            # Log any other message types
-                            self._log(f"Unknown message type: {msg_type}", level=2)
-                            if self.on_log:
-                                await self.on_log(message)
+                        try:
+                            # Handle SSE-style messages that start with "data: "
+                            if line.startswith("data: "):
+                                line = line[len("data: ") :]
 
-                    except json.JSONDecodeError:
-                        self._log(f"Could not parse line as JSON: {line}", level=2)
-                        continue
+                            message = json.loads(line)
+                            # Handle different message types
+                            msg_type = message.get("type")
+
+                            if msg_type == "system":
+                                status = message.get("data", {}).get("status")
+                                if status == "finished":
+                                    result = message.get("data", {}).get("result")
+                                    self._log(
+                                        f"FINISHED WITH RESULT: {result}", level=3
+                                    )
+                                    return result
+                            elif msg_type == "log":
+                                # Log message from data.message
+                                log_msg = message.get("data", {}).get("message", "")
+                                self._log(log_msg, level=3)
+                                if self.on_log:
+                                    await self.on_log(message)
+                            else:
+                                # Log any other message types
+                                self._log(f"Unknown message type: {msg_type}", level=3)
+                                if self.on_log:
+                                    await self.on_log(message)
+
+                        except json.JSONDecodeError:
+                            self._log(f"Could not parse line as JSON: {line}", level=3)
+                            continue
+            except Exception as e:
+                self._log(f"EXCEPTION IN _EXECUTE: {str(e)}")
+                raise
 
         # If we get here without seeing a "finished" message, something went wrong
-        raise RuntimeError("Server connection closed without sending 'finished' message")
+        self._log("==== ERROR: No 'finished' message received ====", level=3)
+        raise RuntimeError(
+            "Server connection closed without sending 'finished' message"
+        )
 
     async def _handle_log(self, msg: Dict[str, Any]):
         """
         Handle a log line from the server. If on_log is set, call it asynchronously.
         """
         if self.verbose >= 1:
-            self._log(f"Log message: {msg}", level=1)
+            self._log(f"Log message: {msg}", level=3)
         if self.on_log:
             try:
                 await self.on_log(msg)
             except Exception as e:
-                self._log(f"on_log callback error: {str(e)}", level=2)
+                self._log(f"on_log callback error: {str(e)}", level=3)
 
     def _log(self, message: str, level: int = 1):
         """
@@ -387,7 +441,7 @@ class Stagehand:
         if self.verbose >= level:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             formatted_msg = f"{timestamp}::[stagehand] {message}"
-            
+
             if level == 1:
                 logger.info(formatted_msg)
             elif level == 2:

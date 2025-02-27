@@ -1,16 +1,18 @@
 import asyncio
+
 from evals.init_stagehand import init_stagehand
 from stagehand.schemas import ObserveOptions
+
 
 async def observe_yc_startup(model_name: str, logger) -> dict:
     """
     This function evaluates the YC startups page by:
-    
+
       1. Initializing Stagehand with the provided model name and logger.
       2. Navigating to "https://www.ycombinator.com/companies" and waiting for the page to reach network idle.
       3. Invoking the observe command to locate the container element housing startup information.
       4. Checking against candidate locators to determine if a matching element is found.
-      
+
     Returns a dictionary containing:
       - _success (bool): True if a matching container element is found.
       - matchedLocator (Optional[str]): The candidate locator string that matched.
@@ -31,16 +33,18 @@ async def observe_yc_startup(model_name: str, logger) -> dict:
         if isinstance(init_response.get("sessionUrl"), dict)
         else init_response.get("sessionUrl")
     )
-    
+
     # Navigate to the YC companies page and wait until network idle
     await stagehand.page.goto("https://www.ycombinator.com/companies")
     await stagehand.page.wait_for_load_state("networkidle")
-    
+
     # Use the observe command with the appropriate instruction
-    observations = await stagehand.page.observe(ObserveOptions(
-        instruction="Find the container element that holds links to each of the startup companies. The companies each have a name, a description, and a link to their website."
-    ))
-    
+    observations = await stagehand.page.observe(
+        ObserveOptions(
+            instruction="Find the container element that holds links to each of the startup companies. The companies each have a name, a description, and a link to their website."
+        )
+    )
+
     # If no observations were returned, mark eval as unsuccessful and return early.
     if not observations:
         await stagehand.close()
@@ -49,22 +53,22 @@ async def observe_yc_startup(model_name: str, logger) -> dict:
             "observations": observations,
             "debugUrl": debug_url,
             "sessionUrl": session_url,
-            "logs": logger.get_logs() if hasattr(logger, "get_logs") else []
+            "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
         }
-    
+
     # Define candidate locators for the container element.
     possible_locators = [
         "div._section_1pgsr_163._results_1pgsr_343",
         "div._rightCol_1pgsr_592",
     ]
-    
+
     possible_handles = []
     for locator_str in possible_locators:
         locator = stagehand.page.locator(locator_str)
         handle = await locator.element_handle()
         if handle:
             possible_handles.append((locator_str, handle))
-    
+
     # Iterate over each observation to determine if it matches any of the candidate locators.
     found_match = False
     matched_locator = None
@@ -89,12 +93,14 @@ async def observe_yc_startup(model_name: str, logger) -> dict:
             if found_match:
                 break
         except Exception as e:
-            print(f"Warning: Failed to check observation with selector {observation.get('selector')}: {str(e)}")
+            print(
+                f"Warning: Failed to check observation with selector {observation.get('selector')}: {str(e)}"
+            )
             continue
 
     # Cleanup and close the Stagehand client.
     await stagehand.close()
-    
+
     # Return the evaluation results.
     return {
         "_success": found_match,
@@ -102,25 +108,29 @@ async def observe_yc_startup(model_name: str, logger) -> dict:
         "observations": observations,
         "debugUrl": debug_url,
         "sessionUrl": session_url,
-        "logs": logger.get_logs() if hasattr(logger, "get_logs") else []
+        "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
     }
-    
+
+
 # For quick local testing
 if __name__ == "__main__":
-    import os
     import asyncio
     import logging
+
     logging.basicConfig(level=logging.INFO)
-    
+
     class SimpleLogger:
         def __init__(self):
             self._logs = []
+
         def info(self, message):
             self._logs.append(message)
             print("INFO:", message)
+
         def error(self, message):
             self._logs.append(message)
             print("ERROR:", message)
+
         def get_logs(self):
             return self._logs
 
@@ -128,5 +138,5 @@ if __name__ == "__main__":
         logger = SimpleLogger()
         result = await observe_yc_startup("gpt-4o-mini", logger)
         print("Result:", result)
-        
-    asyncio.run(main()) 
+
+    asyncio.run(main())

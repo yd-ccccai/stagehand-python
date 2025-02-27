@@ -1,11 +1,11 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
-with open("README.md", "r", encoding="utf-8") as fh:
+with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
     name="stagehand-py",
-    version="0.2.1",
+    version="0.3.0",
     author="Browserbase, Inc.",
     author_email="support@browserbase.io",
     description="Python SDK for Stagehand",
@@ -26,4 +26,4 @@ setup(
         "pydantic>=1.10.0",
         "playwright>=1.40.0",
     ],
-) 
+)
