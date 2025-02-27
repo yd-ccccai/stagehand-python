@@ -1,20 +1,25 @@
 import asyncio
-import os
 import importlib
 import inspect
+import os
+
 
 # A simple logger to collect logs for the evals
 class SimpleLogger:
     def __init__(self):
         self._logs = []
+
     def info(self, message):
         self._logs.append(message)
         print("INFO:", message)
+
     def error(self, message):
         self._logs.append(message)
         print("ERROR:", message)
+
     def get_logs(self):
         return self._logs
+
 
 async def run_all_evals():
     eval_functions = {}
@@ -22,7 +27,7 @@ async def run_all_evals():
     base_path = os.path.dirname(__file__)
     # Only process evals from these sub repositories
     allowed_dirs = {"act", "extract", "observe"}
-    
+
     # Recursively walk through the evals directory and its children
     for root, _, files in os.walk(base_path):
         # Determine the relative path from the base
@@ -39,7 +44,7 @@ async def run_all_evals():
             # Skip __init__.py and the runner itself
             if file.endswith(".py") and file not in ("__init__.py", "run_all_evals.py"):
                 # Build module import path relative to the package root (assumes folder "evals")
-                if rel_path == '.':
+                if rel_path == ".":
                     module_path = f"evals.{file[:-3]}"
                 else:
                     # Replace OS-specific path separators with dots ('.')
@@ -75,8 +80,9 @@ async def run_all_evals():
 
     return results
 
+
 if __name__ == "__main__":
     final_results = asyncio.run(run_all_evals())
     print("Evaluation Results:")
     for module, res in final_results.items():
-        print(f"{module}: {res}") 
+        print(f"{module}: {res}")

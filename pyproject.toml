@@ -1,0 +1,49 @@
+[tool.ruff]
+# Enable flake8-comprehensions, flake8-bugbear, naming, etc.
+select = ["E", "F", "B", "C4", "UP", "N", "I", "C"]
+ignore = []
+
+# Same as Black
+line-length = 88
+
+# Target Python version
+target-version = "py39"  # Adjust to your version
+
+# Exclude a variety of commonly ignored directories
+exclude = [
+    ".git",
+    ".ruff_cache",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "dist",
+    "tests"
+]
+
+# Allow autofix for all enabled rules (when `--fix` is provided)
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# Naming conventions are part of the N rules
+[tool.ruff.lint.pep8-naming]
+# Allow underscores in class names (e.g. Test_Case)
+classmethod-decorators = ["classmethod", "validator"]
+
+# Per-file ignores
+[tool.ruff.lint.per-file-ignores]
+# Ignore imported but unused in __init__.py files
+"__init__.py" = ["F401"]
+# Ignore unused imports in tests
+"tests/*" = ["F401", "F811"]
+
+# Add more customizations if needed
+[tool.ruff.lint.pydocstyle]
+convention = "google"

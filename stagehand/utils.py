@@ -1,7 +1,7 @@
 import logging
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
+
 
 async def default_log_handler(log_data: dict):
     """
@@ -11,7 +11,7 @@ async def default_log_handler(log_data: dict):
     if "type" in log_data:
         log_type = log_data["type"]
         data = log_data.get("data", {})
-        
+
         if log_type == "system":
             logger.info(f"🔧 SYSTEM: {data}")
         elif log_type == "log":
@@ -20,4 +20,4 @@ async def default_log_handler(log_data: dict):
             logger.info(f"ℹ️ OTHER [{log_type}]: {data}")
     else:
         # Fallback for any other format
-        logger.info(f"🤖 RAW LOG: {log_data}") 
+        logger.info(f"🤖 RAW LOG: {log_data}")

@@ -1,7 +1,9 @@
 import asyncio
 import traceback
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
+
 from evals.init_stagehand import init_stagehand
 from stagehand.schemas import ActOptions, ExtractOptions
 
@@ -49,12 +51,12 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
           - Clicking on the search button
           - Clicking on the first job link
       4. Extracting job posting details using an AI-driven extraction schema.
-      
+
     The extraction schema requires:
       - applicationDeadline: The opening date until which applications are accepted.
       - minimumQualifications: An object with degree and yearsOfExperience.
       - preferredQualifications: An object with degree and yearsOfExperience.
-      
+
     Returns a dictionary containing:
       - _success (bool): Whether valid job details were extracted.
       - jobDetails (dict): The extracted job details.
@@ -77,7 +79,7 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
 
     try:
         await stagehand.page.navigate("https://www.google.com/")
-        await asyncio.sleep(3) 
+        await asyncio.sleep(3)
         await stagehand.page.act(ActOptions(action="click on the about page"))
         await stagehand.page.act(ActOptions(action="click on the careers page"))
         await stagehand.page.act(ActOptions(action="input data scientist into role"))
@@ -85,15 +87,17 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
         await stagehand.page.act(ActOptions(action="click on the search button"))
         await stagehand.page.act(ActOptions(action="click on the first job link"))
 
-        job_details = await stagehand.page.extract(ExtractOptions(
-            instruction=(
-                "Extract the following details from the job posting: application deadline, "
-                "minimum qualifications (degree and years of experience), and preferred qualifications "
-                "(degree and years of experience)"
-            ),
-            schemaDefinition=JobDetails.model_json_schema(),
-            useTextExtract=use_text_extract
-        ))
+        job_details = await stagehand.page.extract(
+            ExtractOptions(
+                instruction=(
+                    "Extract the following details from the job posting: application deadline, "
+                    "minimum qualifications (degree and years of experience), and preferred qualifications "
+                    "(degree and years of experience)"
+                ),
+                schemaDefinition=JobDetails.model_json_schema(),
+                useTextExtract=use_text_extract,
+            )
+        )
 
         valid = is_job_details_valid(job_details)
 
@@ -104,19 +108,21 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
             "jobDetails": job_details,
             "debugUrl": debug_url,
             "sessionUrl": session_url,
-            "logs": logger.get_logs() if hasattr(logger, "get_logs") else []
+            "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
         }
     except Exception as e:
         err_message = str(e)
         err_trace = traceback.format_exc()
-        logger.error({
-            "message": "error in google_jobs function",
-            "level": 0,
-            "auxiliary": {
-                "error": {"value": err_message, "type": "string"},
-                "trace": {"value": err_trace, "type": "string"}
+        logger.error(
+            {
+                "message": "error in google_jobs function",
+                "level": 0,
+                "auxiliary": {
+                    "error": {"value": err_message, "type": "string"},
+                    "trace": {"value": err_trace, "type": "string"},
+                },
             }
-        })
+        )
 
         await stagehand.close()
 
@@ -125,31 +131,37 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
             "debugUrl": debug_url,
             "sessionUrl": session_url,
             "error": {"message": err_message, "trace": err_trace},
-            "logs": logger.get_logs() if hasattr(logger, "get_logs") else []
-        } 
-    
+            "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
+        }
+
+
 # For quick local testing
 if __name__ == "__main__":
-    import os
     import asyncio
     import logging
+
     logging.basicConfig(level=logging.INFO)
-    
+
     class SimpleLogger:
         def __init__(self):
             self._logs = []
+
         def info(self, message):
             self._logs.append(message)
             print("INFO:", message)
+
         def error(self, message):
             self._logs.append(message)
             print("ERROR:", message)
+
         def get_logs(self):
             return self._logs
 
     async def main():
         logger = SimpleLogger()
-        result = await google_jobs("gpt-4o-mini", logger, use_text_extract=False) # TODO - use text extract
+        result = await google_jobs(
+            "gpt-4o-mini", logger, use_text_extract=False
+        )  # TODO - use text extract
         print("Result:", result)
-        
-    asyncio.run(main()) 
+
+    asyncio.run(main())
