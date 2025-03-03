@@ -85,14 +85,14 @@ class StagehandPage:
         if isinstance(options, ObserveResult) and hasattr(options, "selector") and hasattr(options, "method"):
             # For ObserveResult, we directly pass it to the server which will
             # execute the method against the selector
-            payload = options.model_dump(exclude_none=True)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
         # Convert string to ActOptions if needed
         elif isinstance(options, str):
             options = ActOptions(action=options)
-            payload = options.model_dump(exclude_none=True)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
         # Otherwise, it should be an ActOptions object
         else:
-            payload = options.model_dump(exclude_none=True)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
 
         lock = self._stagehand._get_lock_for_session()
         async with lock:
@@ -117,7 +117,7 @@ class StagehandPage:
         if isinstance(options, str):
             options = ObserveOptions(instruction=options)
 
-        payload = options.model_dump(exclude_none=True)
+        payload = options.model_dump(exclude_none=True, by_alias=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("observe", payload)
@@ -148,7 +148,7 @@ class StagehandPage:
         if isinstance(options, str):
             options = ExtractOptions(instruction=options)
 
-        payload = options.model_dump(exclude_none=True)
+        payload = options.model_dump(exclude_none=True, by_alias=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("extract", payload)
