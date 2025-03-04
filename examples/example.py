@@ -79,6 +79,7 @@ async def main():
 
     console.print("\n▶️ [highlight] Performing action:[/] search for openai")
     await page.act("search for openai")
+    await page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
 
     console.print("\n▶️ [highlight] Observing page[/] for news button")

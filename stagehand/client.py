@@ -12,7 +12,7 @@ from playwright.async_api import async_playwright
 
 from .config import StagehandConfig
 from .page import StagehandPage
-from .utils import default_log_handler
+from .utils import default_log_handler, convert_dict_keys_to_camel_case
 
 load_dotenv()
 
@@ -361,6 +361,9 @@ class Stagehand:
         modified_payload = dict(payload)
         if hasattr(self, "model_client_options") and self.model_client_options and "modelClientOptions" not in modified_payload:
             modified_payload["modelClientOptions"] = self.model_client_options
+        
+        # Convert snake_case keys to camelCase for the API
+        modified_payload = convert_dict_keys_to_camel_case(modified_payload)
         
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self._log(f"\n==== EXECUTING {method.upper()} ====", level=3)
