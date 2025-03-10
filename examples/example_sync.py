@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 
@@ -7,7 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand.client import Stagehand
+from stagehand.sync import Stagehand
 from stagehand.config import StagehandConfig
 
 # Create a custom theme for consistent styling
@@ -35,7 +34,7 @@ logging.basicConfig(
 )
 
 
-async def main():
+def main():
     # Build a unified configuration object for Stagehand
     config = StagehandConfig(
         env="BROWSERBASE",
@@ -54,54 +53,51 @@ async def main():
 
     # Initialize - this creates a new session automatically.
     console.print("\n🚀 [info]Initializing Stagehand...[/]")
-    await stagehand.init()
-    page = stagehand.page
+    stagehand.init()
     console.print(f"\n[yellow]Created new session:[/] {stagehand.session_id}")
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
 
-    await asyncio.sleep(2)
+    import time
+    time.sleep(2)
 
     console.print("\n▶️ [highlight] Navigating[/] to Google")
-    await page.goto("https://google.com/")
+    stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
 
     console.print("\n▶️ [highlight] Clicking[/] on About link")
     # Click on the "About" link using Playwright
-    await page.get_by_role("link", name="About", exact=True).click()
+    stagehand.page.get_by_role("link", name="About", exact=True).click()
     console.print("✅ [success]Clicked on About link[/]")
 
-    await asyncio.sleep(2)
+    time.sleep(2)
     console.print("\n▶️ [highlight] Navigating[/] back to Google")
-    await page.goto("https://google.com/")
+    stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated back to Google[/]")
 
     console.print("\n▶️ [highlight] Performing action:[/] search for openai")
-    await page.act("search for openai")
-    await page.keyboard.press("Enter")
+    stagehand.page.act("search for openai")
+    stagehand.page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
 
     console.print("\n▶️ [highlight] Observing page[/] for news button")
-    observed = await page.observe("find the news button on the page")
+    observed = stagehand.page.observe("find the news button on the page")
     if len(observed) > 0:
         element = observed[0]
         console.print("✅ [success]Found element:[/] News button")
-        console.print(f"\n▶️ [highlight] Performing action on observed element")
-        await page.act(element)
-        console.print("✅ [success]Performing Action:[/] Action completed successfully")
-
+        stagehand.page.act(element)
     else:
         console.print("❌ [error]No element found[/]")
 
     console.print("\n▶️ [highlight] Extracting[/] first search result")
-    data = await page.extract("extract the first result from the search")
+    data = stagehand.page.extract("extract the first result from the search")
     console.print("📊 [info]Extracted data:[/]")
     console.print_json(f"{data.model_dump_json()}")
 
     # Close the session
     console.print("\n⏹️ [warning]Closing session...[/]")
-    await stagehand.close()
+    stagehand.close()
     console.print("✅ [success]Session closed successfully![/]")
     console.rule("[bold]End of Example[/]")
 
@@ -111,9 +107,9 @@ if __name__ == "__main__":
     console.print(
         "\n",
         Panel.fit(
-            "[light_gray]Stagehand 🤘 Python Example[/]",
+            "[light_gray]Stagehand 🤘 Python Sync Example[/]",
             border_style="green",
             padding=(1, 10),
         ),
     )
-    asyncio.run(main())
+    main() 

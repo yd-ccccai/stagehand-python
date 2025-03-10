@@ -116,7 +116,56 @@ export STAGEHAND_SERVER_URL="url-of-stagehand-server"
 
 ## Quickstart
 
-Below is a minimal example to get started with Stagehand using the new schema-based options:
+Stagehand supports both synchronous and asynchronous usage. Here are examples for both approaches:
+
+### Synchronous Usage
+
+```python
+import os
+from stagehand.sync.client import Stagehand
+from stagehand.schemas import ActOptions, ExtractOptions
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class DescriptionSchema(BaseModel):
+    description: str
+
+def main():
+    # Create a Stagehand client - it will automatically create a new session if needed
+    stagehand = Stagehand(
+        model_name="gpt-4",  # Optional: defaults are available from the server
+    )
+
+    # Initialize Stagehand and create a new session
+    stagehand.init()
+    print(f"Created new session: {stagehand.session_id}")
+
+    # Navigate to a webpage using local Playwright controls
+    stagehand.page.goto("https://www.example.com")
+    print("Navigation complete.")
+
+    # Perform an action using the AI (e.g. simulate a button click)
+    stagehand.page.act("click on the 'Quickstart' button")
+
+    # Extract data from the page with schema validation
+    data = stagehand.page.extract(
+        ExtractOptions(
+            instruction="extract the description of the page",
+            schemaDefinition=DescriptionSchema.model_json_schema()
+        )
+    )
+    description = data.get("description") if isinstance(data, dict) else data.description
+    print("Extracted description:", description)
+
+    stagehand.close()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Asynchronous Usage
 
 ```python
 import asyncio
@@ -146,7 +195,7 @@ async def main():
     print("Navigation complete.")
 
     # Perform an action using the AI (e.g. simulate a button click)
-    await stagehand.page.act(ActOptions(action="click on the 'Quickstart' button"))
+    await stagehand.page.act("click on the 'Quickstart' button")
 
     # Extract data from the page with schema validation
     data = await stagehand.page.extract(
@@ -164,18 +213,13 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-
-## Running Evaluations
+## Evals
 
 To test all evaluations, run the following command in your terminal:
 
-
-```bash
-python evals/run_all_evals.py
-```
+`python evals/run_all_evals.py`
 
 This script will dynamically discover and execute every evaluation module within the `evals` directory and print the results for each.
-
 
 ## More Examples
 
@@ -197,6 +241,8 @@ Stagehand can be configured via environment variables or through a `StagehandCon
 - `model_name`: Optional model name for the AI.
 - `dom_settle_timeout_ms`: Additional time (in ms) to have the DOM settle.
 - `debug_dom`: Enable debug mode for DOM operations.
+- `stream_response`: Whether to stream responses from the server (default: True).
+- `timeout_settings`: Custom timeout settings for HTTP requests.
 
 Example using a unified configuration:
 
@@ -220,17 +266,33 @@ config = StagehandConfig(
 
 - **AI-powered Browser Control**: Execute natural language instructions over a running browser.
 - **Validated Data Extraction**: Use JSON schemas (or Pydantic models) to extract and validate information from pages.
-- **Async/Await Support**: Built using Python's asyncio, making it easy to build scalable web automation workflows.
+- **Async/Sync Support**: Choose between asynchronous and synchronous APIs based on your needs.
+- **Context Manager Support**: Automatic resource cleanup with async and sync context managers.
 - **Extensible**: Seamlessly extend Playwright functionality with AI enrichments.
+- **Streaming Support**: Sreaming responses for better performance with long-running operations. Default True.
 
 ## Requirements
 
 - Python 3.7+
-- httpx
-- asyncio
+- httpx (for async client)
+- requests (for sync client)
+- asyncio (for async client)
 - pydantic
 - python-dotenv (optional, for .env support)
 - playwright
+
+## Contributing
+
+### Running Tests
+
+The project uses pytest for testing. To run the tests:
+
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+chmod +x run_tests.sh && ./run_tests.sh
+```
 
 ## License
 

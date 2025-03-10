@@ -1,8 +1,8 @@
 from typing import List, Optional, Union
 
-from playwright.async_api import Page
+from playwright.sync_api import Page
 
-from .schemas import (
+from ..schemas import (
     ActOptions,
     ActResult,
     ExtractOptions,
@@ -12,21 +12,21 @@ from .schemas import (
 )
 
 
-class StagehandPage:
-    """Wrapper around Playwright Page that integrates with Stagehand server"""
+class SyncStagehandPage:
+    """Synchronous wrapper around Playwright Page that integrates with Stagehand server"""
 
     def __init__(self, page: Page, stagehand_client):
         """
-        Initialize a StagehandPage instance.
+        Initialize a SyncStagehandPage instance.
 
         Args:
             page (Page): The underlying Playwright page.
-            stagehand_client: The client used to interface with the Stagehand server.
+            stagehand_client: The sync client used to interface with the Stagehand server.
         """
         self.page = page
         self._stagehand = stagehand_client
 
-    async def goto(
+    def goto(
         self,
         url: str,
         *,
@@ -35,7 +35,7 @@ class StagehandPage:
         wait_until: Optional[str] = None
     ):
         """
-        Navigate to URL using the Stagehand server.
+        Navigate to URL using the Stagehand server synchronously.
 
         Args:
             url (str): The URL to navigate to.
@@ -59,24 +59,18 @@ class StagehandPage:
         if options:
             payload["options"] = options
 
-        lock = self._stagehand._get_lock_for_session()
-        async with lock:
-            result = await self._stagehand._execute("navigate", payload)
+        result = self._stagehand._execute("navigate", payload)
         return result
 
-    async def act(self, options: Union[str, ActOptions, ObserveResult]) -> ActResult:
+    def act(self, options: Union[str, ActOptions, ObserveResult]) -> ActResult:
         """
-        Execute an AI action via the Stagehand server.
+        Execute an AI action via the Stagehand server synchronously.
 
         Args:
             options (Union[str, ActOptions, ObserveResult]):
                 - A string with the action command to be executed by the AI
                 - An ActOptions object encapsulating the action command and optional parameters
                 - An ObserveResult with selector and method fields for direct execution without LLM
-                
-                When an ObserveResult with both 'selector' and 'method' fields is provided,
-                the SDK will directly execute the action against the selector using the method 
-                and arguments provided, bypassing the LLM processing.
 
         Returns:
             ActResult: The result from the Stagehand server's action execution.
@@ -94,21 +88,18 @@ class StagehandPage:
         else:
             payload = options.model_dump(exclude_none=True, by_alias=True)
 
-        lock = self._stagehand._get_lock_for_session()
-        async with lock:
-            result = await self._stagehand._execute("act", payload)
+        result = self._stagehand._execute("act", payload)
         if isinstance(result, dict):
             return ActResult(**result)
         return result
 
-    async def observe(self, options: Union[str, ObserveOptions]) -> List[ObserveResult]:
+    def observe(self, options: Union[str, ObserveOptions]) -> List[ObserveResult]:
         """
-        Make an AI observation via the Stagehand server.
+        Make an AI observation via the Stagehand server synchronously.
 
         Args:
             options (Union[str, ObserveOptions]): Either a string with the observation instruction
                 or a Pydantic model encapsulating the observation instruction.
-                See `stagehand.schemas.ObserveOptions` for details on expected fields.
 
         Returns:
             List[ObserveResult]: A list of observation results from the Stagehand server.
@@ -118,9 +109,7 @@ class StagehandPage:
             options = ObserveOptions(instruction=options)
 
         payload = options.model_dump(exclude_none=True, by_alias=True)
-        lock = self._stagehand._get_lock_for_session()
-        async with lock:
-            result = await self._stagehand._execute("observe", payload)
+        result = self._stagehand._execute("observe", payload)
 
         # Convert raw result to list of ObserveResult models
         if isinstance(result, list):
@@ -130,28 +119,22 @@ class StagehandPage:
             return [ObserveResult(**result)]
         return []
 
-    async def extract(self, options: Union[str, ExtractOptions]) -> ExtractResult:
+    def extract(self, options: Union[str, ExtractOptions]) -> ExtractResult:
         """
-        Extract data using AI via the Stagehand server.
-
-        Expects an ExtractOptions Pydantic object that includes a JSON schema (or Pydantic model)
-        for validation.
+        Extract data using AI via the Stagehand server synchronously.
 
         Args:
-            options (ExtractOptions): The extraction options describing what to extract and how.
-                See `stagehand.schemas.ExtractOptions` for details on expected fields.
+            options (Union[str, ExtractOptions]): The extraction options describing what to extract and how.
 
         Returns:
-            Any: The result from the Stagehand server's extraction execution.
+            ExtractResult: The result from the Stagehand server's extraction execution.
         """
         # Convert string to ExtractOptions if needed
         if isinstance(options, str):
             options = ExtractOptions(instruction=options)
 
         payload = options.model_dump(exclude_none=True, by_alias=True)
-        lock = self._stagehand._get_lock_for_session()
-        async with lock:
-            result = await self._stagehand._execute("extract", payload)
+        result = self._stagehand._execute("extract", payload)
         if isinstance(result, dict):
             return ExtractResult(**result)
         return result
@@ -167,4 +150,4 @@ class StagehandPage:
         Returns:
             The attribute from the underlying Playwright page.
         """
-        return getattr(self.page, name)
+        return getattr(self.page, name) 

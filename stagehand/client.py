@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import time
 from collections.abc import Awaitable
 from typing import Any, Callable, Dict, Optional
@@ -12,14 +11,15 @@ from playwright.async_api import async_playwright
 
 from .config import StagehandConfig
 from .page import StagehandPage
-from .utils import default_log_handler
+from .utils import default_log_handler, convert_dict_keys_to_camel_case
+from .base import StagehandBase
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
-class Stagehand:
+class Stagehand(StagehandBase):
     """
     Python client for interacting with a running Stagehand server and Browserbase remote headless browser.
 
@@ -47,6 +47,8 @@ class Stagehand:
         debug_dom: Optional[bool] = None,
         httpx_client: Optional[httpx.AsyncClient] = None,
         timeout_settings: Optional[httpx.Timeout] = None,
+        model_client_options: Optional[Dict[str, Any]] = None,
+        stream_response: Optional[bool] = None,
     ):
         """
         Initialize the Stagehand client.
@@ -65,48 +67,26 @@ class Stagehand:
             debug_dom (Optional[bool]): Whether to enable DOM debugging mode.
             httpx_client (Optional[httpx.AsyncClient]): Optional custom httpx.AsyncClient instance.
             timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
+            model_client_options (Optional[Dict[str, Any]]): Optional model client options.
+            stream_response (Optional[bool]): Whether to stream responses from the server.
         """
-        self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
-
-        if config:
-            self.browserbase_api_key = (
-                config.api_key
-                or browserbase_api_key
-                or os.getenv("BROWSERBASE_API_KEY")
-            )
-            self.browserbase_project_id = (
-                config.project_id
-                or browserbase_project_id
-                or os.getenv("BROWSERBASE_PROJECT_ID")
-            )
-            self.model_api_key = os.getenv("MODEL_API_KEY")
-            self.session_id = config.browserbase_session_id or session_id
-            self.model_name = config.model_name or model_name
-            self.dom_settle_timeout_ms = (
-                config.dom_settle_timeout_ms or dom_settle_timeout_ms
-            )
-            self.debug_dom = (
-                config.debug_dom if config.debug_dom is not None else debug_dom
-            )
-            self._custom_logger = config.logger  # For future integration if needed
-            # Additional config parameters available for future use:
-            self.headless = config.headless
-            self.enable_caching = config.enable_caching
-        else:
-            self.browserbase_api_key = browserbase_api_key or os.getenv(
-                "BROWSERBASE_API_KEY"
-            )
-            self.browserbase_project_id = browserbase_project_id or os.getenv(
-                "BROWSERBASE_PROJECT_ID"
-            )
-            self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
-            self.session_id = session_id
-            self.model_name = model_name
-            self.dom_settle_timeout_ms = dom_settle_timeout_ms
-            self.debug_dom = debug_dom
-
-        self.on_log = on_log
-        self.verbose = verbose
+        super().__init__(
+            config=config,
+            server_url=server_url,
+            session_id=session_id,
+            browserbase_api_key=browserbase_api_key,
+            browserbase_project_id=browserbase_project_id,
+            model_api_key=model_api_key,
+            on_log=on_log,
+            verbose=verbose,
+            model_name=model_name,
+            dom_settle_timeout_ms=dom_settle_timeout_ms,
+            debug_dom=debug_dom,
+            timeout_settings=timeout_settings,
+            stream_response=stream_response,
+            model_client_options=model_client_options,
+        )
+        
         self.httpx_client = httpx_client
         self.timeout_settings = timeout_settings or httpx.Timeout(
             connect=180.0,
@@ -114,7 +94,6 @@ class Stagehand:
             write=180.0,
             pool=180.0,
         )
-        self.streamed_response = True  # Default to True for streamed responses
 
         self._client: Optional[httpx.AsyncClient] = None
         self._playwright = None
@@ -312,6 +291,9 @@ class Stagehand:
             "verbose": self.verbose,
             "debugDom": self.debug_dom,
         }
+        
+        if hasattr(self, "model_client_options") and self.model_client_options:
+            payload["modelClientOptions"] = self.model_client_options
 
         headers = {
             "x-bb-api-key": self.browserbase_api_key,
@@ -350,21 +332,48 @@ class Stagehand:
         }
         if self.model_api_key:
             headers["x-model-api-key"] = self.model_api_key
-
+        
+        modified_payload = dict(payload)
+        if hasattr(self, "model_client_options") and self.model_client_options and "modelClientOptions" not in modified_payload:
+            modified_payload["modelClientOptions"] = self.model_client_options
+        
+        # Convert snake_case keys to camelCase for the API
+        modified_payload = convert_dict_keys_to_camel_case(modified_payload)
+        
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self._log(f"\n==== EXECUTING {method.upper()} ====", level=3)
         self._log(
             f"URL: {self.server_url}/sessions/{self.session_id}/{method}", level=3
         )
-        self._log(f"Payload: {payload}", level=3)
+        self._log(f"Payload: {modified_payload}", level=3)
         self._log(f"Headers: {headers}", level=3)
-
+        
         async with client:
             try:
+                if not self.streamed_response:
+                    # For non-streaming responses, just return the final result
+                    response = await client.post(
+                        f"{self.server_url}/sessions/{self.session_id}/{method}",
+                        json=modified_payload,
+                        headers=headers,
+                    )
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        error_message = error_text.decode("utf-8")
+                        self._log(f"Error: {error_message}", level=3)
+                        return None
+                    
+                    data = response.json()
+                    if data.get("success"):
+                        return data.get("data", {}).get("result")
+                    else:
+                        raise RuntimeError(f"Request failed: {data.get('error', 'Unknown error')}")
+
+                # Handle streaming response
                 async with client.stream(
                     "POST",
                     f"{self.server_url}/sessions/{self.session_id}/{method}",
-                    json=payload,
+                    json=modified_payload,
                     headers=headers,
                 ) as response:
                     if response.status_code != 200:
