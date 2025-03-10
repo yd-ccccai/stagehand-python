@@ -6,8 +6,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand.sync import Stagehand
 from stagehand.config import StagehandConfig
+from stagehand.sync import Stagehand
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
@@ -60,6 +60,7 @@ def main():
     )
 
     import time
+
     time.sleep(2)
 
     console.print("\n▶️ [highlight] Navigating[/] to Google")
@@ -112,4 +113,4 @@ if __name__ == "__main__":
             padding=(1, 10),
         ),
     )
-    main() 
+    main()

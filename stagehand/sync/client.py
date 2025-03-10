@@ -1,23 +1,24 @@
-import os
-import time
-import logging
 import json
-from typing import Any, Dict, Optional, Callable
+import logging
+import time
+from typing import Any, Callable, Optional
 
 import requests
 from playwright.sync_api import sync_playwright
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
+from ..utils import convert_dict_keys_to_camel_case, default_log_handler
 from .page import SyncStagehandPage
-from ..utils import default_log_handler, convert_dict_keys_to_camel_case
 
 logger = logging.getLogger(__name__)
+
 
 class Stagehand(StagehandBase):
     """
     Synchronous implementation of the Stagehand client.
     """
+
     def __init__(
         self,
         config: Optional[StagehandConfig] = None,
@@ -26,13 +27,13 @@ class Stagehand(StagehandBase):
         browserbase_api_key: Optional[str] = None,
         browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[Dict[str, Any]], Any]] = default_log_handler,
+        on_log: Optional[Callable[[dict[str, Any]], Any]] = default_log_handler,
         verbose: int = 1,
         model_name: Optional[str] = None,
         dom_settle_timeout_ms: Optional[int] = None,
         debug_dom: Optional[bool] = None,
         timeout_settings: Optional[float] = None,
-        model_client_options: Optional[Dict[str, Any]] = None,
+        model_client_options: Optional[dict[str, Any]] = None,
         stream_response: Optional[bool] = None,
     ):
         super().__init__(
@@ -162,7 +163,9 @@ class Stagehand(StagehandBase):
                 headers = {
                     "x-bb-api-key": self.browserbase_api_key,
                 }
-                resp = self._client.get(f"{self.server_url}/healthcheck", headers=headers)
+                resp = self._client.get(
+                    f"{self.server_url}/healthcheck", headers=headers
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("status") == "ok":
@@ -174,7 +177,7 @@ class Stagehand(StagehandBase):
             if time.time() - start > timeout:
                 raise TimeoutError(f"Server not responding after {timeout} seconds.")
 
-            wait_time = min(2 ** attempt * 0.5, 5.0)
+            wait_time = min(2**attempt * 0.5, 5.0)
             time.sleep(wait_time)
             attempt += 1
 
@@ -195,7 +198,7 @@ class Stagehand(StagehandBase):
             "verbose": self.verbose,
             "debugDom": self.debug_dom,
         }
-        
+
         if self.model_client_options:
             payload["modelClientOptions"] = self.model_client_options
 
@@ -219,7 +222,7 @@ class Stagehand(StagehandBase):
             raise RuntimeError(f"Invalid response format: {resp.text}")
         self.session_id = data["data"]["sessionId"]
 
-    def _execute(self, method: str, payload: Dict[str, Any]) -> Any:
+    def _execute(self, method: str, payload: dict[str, Any]) -> Any:
         """
         Execute a command synchronously.
         """
@@ -236,30 +239,34 @@ class Stagehand(StagehandBase):
         modified_payload = dict(payload)
         if self.model_client_options and "modelClientOptions" not in modified_payload:
             modified_payload["modelClientOptions"] = self.model_client_options
-        
+
         # Convert snake_case keys to camelCase for the API
         modified_payload = convert_dict_keys_to_camel_case(modified_payload)
-        
+
         url = f"{self.server_url}/sessions/{self.session_id}/{method}"
         self._log(f"\n==== EXECUTING {method.upper()} ====", level=3)
         self._log(f"URL: {url}", level=3)
         self._log(f"Payload: {modified_payload}", level=3)
         self._log(f"Headers: {headers}", level=3)
-        
+
         try:
             if not self.streamed_response:
                 # For non-streaming responses, just return the final result
-                response = self._client.post(url, json=modified_payload, headers=headers)
+                response = self._client.post(
+                    url, json=modified_payload, headers=headers
+                )
                 if response.status_code != 200:
                     error_message = response.text
                     self._log(f"Error: {error_message}", level=3)
                     return None
-                
+
                 return response.json()  # Return the raw response as the result
 
             # Handle streaming response
             self._log("Starting to process streaming response...", level=3)
-            response = self._client.post(url, json=modified_payload, headers=headers, stream=True)
+            response = self._client.post(
+                url, json=modified_payload, headers=headers, stream=True
+            )
             if response.status_code != 200:
                 error_message = response.text
                 self._log(f"Error: {error_message}", level=3)
@@ -301,4 +308,6 @@ class Stagehand(StagehandBase):
             raise
 
         self._log("==== ERROR: No 'finished' message received ====", level=3)
-        raise RuntimeError("Server connection closed without sending 'finished' message")
+        raise RuntimeError(
+            "Server connection closed without sending 'finished' message"
+        )

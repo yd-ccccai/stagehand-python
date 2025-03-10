@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from playwright.async_api import Page
 
@@ -32,7 +32,7 @@ class StagehandPage:
         *,
         referer: Optional[str] = None,
         timeout: Optional[int] = None,
-        wait_until: Optional[str] = None
+        wait_until: Optional[str] = None,
     ):
         """
         Navigate to URL using the Stagehand server.
@@ -73,16 +73,20 @@ class StagehandPage:
                 - A string with the action command to be executed by the AI
                 - An ActOptions object encapsulating the action command and optional parameters
                 - An ObserveResult with selector and method fields for direct execution without LLM
-                
+
                 When an ObserveResult with both 'selector' and 'method' fields is provided,
-                the SDK will directly execute the action against the selector using the method 
+                the SDK will directly execute the action against the selector using the method
                 and arguments provided, bypassing the LLM processing.
 
         Returns:
             ActResult: The result from the Stagehand server's action execution.
         """
         # Check if options is an ObserveResult with both selector and method
-        if isinstance(options, ObserveResult) and hasattr(options, "selector") and hasattr(options, "method"):
+        if (
+            isinstance(options, ObserveResult)
+            and hasattr(options, "selector")
+            and hasattr(options, "method")
+        ):
             # For ObserveResult, we directly pass it to the server which will
             # execute the method against the selector
             payload = options.model_dump(exclude_none=True, by_alias=True)
@@ -101,7 +105,7 @@ class StagehandPage:
             return ActResult(**result)
         return result
 
-    async def observe(self, options: Union[str, ObserveOptions]) -> List[ObserveResult]:
+    async def observe(self, options: Union[str, ObserveOptions]) -> list[ObserveResult]:
         """
         Make an AI observation via the Stagehand server.
 
@@ -111,7 +115,7 @@ class StagehandPage:
                 See `stagehand.schemas.ObserveOptions` for details on expected fields.
 
         Returns:
-            List[ObserveResult]: A list of observation results from the Stagehand server.
+            list[ObserveResult]: A list of observation results from the Stagehand server.
         """
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):

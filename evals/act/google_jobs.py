@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from typing import Any, Dict, Optional
+from typing import Any, Optional, dict
 
 from pydantic import BaseModel
 
@@ -10,23 +10,24 @@ from stagehand.schemas import ActOptions, ExtractOptions
 
 class Qualifications(BaseModel):
     degree: Optional[str] = None
-    yearsOfExperience: Optional[float] = None  # Representing the number
+    years_of_experience: Optional[float] = None  # Representing the number
 
 
 class JobDetails(BaseModel):
-    applicationDeadline: Optional[str] = None
-    minimumQualifications: Qualifications
-    preferredQualifications: Qualifications
+    application_deadline: Optional[str] = None
+    minimum_qualifications: Qualifications
+    preferred_qualifications: Qualifications
 
 
-def is_job_details_valid(details: Dict[str, Any]) -> bool:
+def is_job_details_valid(details: dict[str, Any]) -> bool:
     """
     Validates that each top-level field in the extracted job details is not None.
-    For nested dictionary values, each sub-value must be non-null and a string or a number.
+    For nested dictionary values, each sub-value must be non-null and a string
+    or a number.
     """
     if not details:
         return False
-    for key, value in details.items():
+    for _key, value in details.items():
         if value is None:
             return False
         if isinstance(value, dict):
@@ -53,9 +54,9 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
       4. Extracting job posting details using an AI-driven extraction schema.
 
     The extraction schema requires:
-      - applicationDeadline: The opening date until which applications are accepted.
-      - minimumQualifications: An object with degree and yearsOfExperience.
-      - preferredQualifications: An object with degree and yearsOfExperience.
+      - application_deadline: The opening date until which applications are accepted.
+      - minimum_qualifications: An object with degree and years_of_experience.
+      - preferred_qualifications: An object with degree and years_of_experience.
 
     Returns a dictionary containing:
       - _success (bool): Whether valid job details were extracted.
@@ -90,8 +91,9 @@ async def google_jobs(model_name: str, logger, use_text_extract: bool) -> dict:
         job_details = await stagehand.page.extract(
             ExtractOptions(
                 instruction=(
-                    "Extract the following details from the job posting: application deadline, "
-                    "minimum qualifications (degree and years of experience), and preferred qualifications "
+                    "Extract the following details from the job posting: "
+                    "application deadline, minimum qualifications "
+                    "(degree and years of experience), and preferred qualifications "
                     "(degree and years of experience)"
                 ),
                 schemaDefinition=JobDetails.model_json_schema(),

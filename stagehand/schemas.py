@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, field_serializer
 
@@ -20,12 +20,12 @@ class AvailableModel(str, Enum):
 
 class StagehandBaseModel(BaseModel):
     """Base model for all Stagehand models with camelCase conversion support"""
-    
+
     class Config:
         populate_by_name = True  # Allow accessing fields by their Python name
-        alias_generator = lambda field_name: ''.join(
-            [field_name.split('_')[0]] + 
-            [word.capitalize() for word in field_name.split('_')[1:]]
+        alias_generator = lambda field_name: "".join(
+            [field_name.split("_")[0]]
+            + [word.capitalize() for word in field_name.split("_")[1:]]
         )  # snake_case to camelCase
 
 
@@ -35,13 +35,13 @@ class ActOptions(StagehandBaseModel):
 
     Attributes:
         action (str): The action command to be executed by the AI.
-        variables: Optional[Dict[str, str]] = None
+        variables: Optional[dict[str, str]] = None
         model_name: Optional[AvailableModel] = None
         slow_dom_based_act: Optional[bool] = None
     """
 
     action: str = Field(..., description="The action command to be executed by the AI.")
-    variables: Optional[Dict[str, str]] = None
+    variables: Optional[dict[str, str]] = None
     model_name: Optional[AvailableModel] = None
     slow_dom_based_act: Optional[bool] = None
 
@@ -69,7 +69,7 @@ class ExtractOptions(StagehandBaseModel):
         instruction (str): Instruction specifying what data to extract using AI.
         model_name: Optional[AvailableModel] = None
         selector: Optional[str] = None
-        schema_definition (Union[Dict[str, Any], Type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
+        schema_definition (Union[dict[str, Any], type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
             Note: If passing a Pydantic model, invoke its .model_json_schema() method to ensure the schema is JSON serializable.
         use_text_extract: Optional[bool] = None
     """
@@ -81,16 +81,20 @@ class ExtractOptions(StagehandBaseModel):
     selector: Optional[str] = None
     # IMPORTANT: If using a Pydantic model for schema_definition, please call its .model_json_schema() method
     # to convert it to a JSON serializable dictionary before sending it with the extract command.
-    schema_definition: Union[Dict[str, Any], Type[BaseModel]] = Field(
+    schema_definition: Union[dict[str, Any], type[BaseModel]] = Field(
         default=DEFAULT_EXTRACT_SCHEMA,
         description="A JSON schema or Pydantic model that defines the structure of the expected data.",
     )
     use_text_extract: Optional[bool] = True
 
-    @field_serializer('schema_definition')
-    def serialize_schema_definition(self, schema_definition: Union[Dict[str, Any], Type[BaseModel]]) -> Dict[str, Any]:
+    @field_serializer("schema_definition")
+    def serialize_schema_definition(
+        self, schema_definition: Union[dict[str, Any], type[BaseModel]]
+    ) -> dict[str, Any]:
         """Serialize schema_definition to a JSON schema if it's a Pydantic model"""
-        if isinstance(schema_definition, type) and issubclass(schema_definition, BaseModel):
+        if isinstance(schema_definition, type) and issubclass(
+            schema_definition, BaseModel
+        ):
             return schema_definition.model_json_schema()
         return schema_definition
 
@@ -152,7 +156,7 @@ class ObserveResult(StagehandBaseModel):
     )
     backend_node_id: Optional[int] = None
     method: Optional[str] = None
-    arguments: Optional[List[str]] = None
+    arguments: Optional[list[str]] = None
 
     def __getitem__(self, key):
         """

@@ -3,16 +3,16 @@ import json
 import logging
 import time
 from collections.abc import Awaitable
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 import httpx
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
+from .base import StagehandBase
 from .config import StagehandConfig
 from .page import StagehandPage
-from .utils import default_log_handler, convert_dict_keys_to_camel_case
-from .base import StagehandBase
+from .utils import convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
 
@@ -39,7 +39,7 @@ class Stagehand(StagehandBase):
         browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
         on_log: Optional[
-            Callable[[Dict[str, Any]], Awaitable[None]]
+            Callable[[dict[str, Any]], Awaitable[None]]
         ] = default_log_handler,
         verbose: int = 1,
         model_name: Optional[str] = None,
@@ -47,7 +47,7 @@ class Stagehand(StagehandBase):
         debug_dom: Optional[bool] = None,
         httpx_client: Optional[httpx.AsyncClient] = None,
         timeout_settings: Optional[httpx.Timeout] = None,
-        model_client_options: Optional[Dict[str, Any]] = None,
+        model_client_options: Optional[dict[str, Any]] = None,
         stream_response: Optional[bool] = None,
     ):
         """
@@ -60,14 +60,14 @@ class Stagehand(StagehandBase):
             browserbase_api_key (Optional[str]): Your Browserbase API key.
             browserbase_project_id (Optional[str]): Your Browserbase project ID.
             model_api_key (Optional[str]): Your model API key (e.g. OpenAI, Anthropic, etc.).
-            on_log (Optional[Callable[[Dict[str, Any]], Awaitable[None]]]): Async callback for log messages from the server.
+            on_log (Optional[Callable[[dict[str, Any]], Awaitable[None]]]): Async callback for log messages from the server.
             verbose (int): Verbosity level for logs.
             model_name (Optional[str]): Model name to use when creating a new session.
             dom_settle_timeout_ms (Optional[int]): Additional time for the DOM to settle (in ms).
             debug_dom (Optional[bool]): Whether to enable DOM debugging mode.
             httpx_client (Optional[httpx.AsyncClient]): Optional custom httpx.AsyncClient instance.
             timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
-            model_client_options (Optional[Dict[str, Any]]): Optional model client options.
+            model_client_options (Optional[dict[str, Any]]): Optional model client options.
             stream_response (Optional[bool]): Whether to stream responses from the server.
         """
         super().__init__(
@@ -86,7 +86,7 @@ class Stagehand(StagehandBase):
             stream_response=stream_response,
             model_client_options=model_client_options,
         )
-        
+
         self.httpx_client = httpx_client
         self.timeout_settings = timeout_settings or httpx.Timeout(
             connect=180.0,
@@ -291,7 +291,7 @@ class Stagehand(StagehandBase):
             "verbose": self.verbose,
             "debugDom": self.debug_dom,
         }
-        
+
         if hasattr(self, "model_client_options") and self.model_client_options:
             payload["modelClientOptions"] = self.model_client_options
 
@@ -318,7 +318,7 @@ class Stagehand(StagehandBase):
 
             self.session_id = data["data"]["sessionId"]
 
-    async def _execute(self, method: str, payload: Dict[str, Any]) -> Any:
+    async def _execute(self, method: str, payload: dict[str, Any]) -> Any:
         """
         Internal helper to call /sessions/{session_id}/{method} with the given method and payload.
         Streams line-by-line, returning the 'result' from the final message (if any).
@@ -332,14 +332,18 @@ class Stagehand(StagehandBase):
         }
         if self.model_api_key:
             headers["x-model-api-key"] = self.model_api_key
-        
+
         modified_payload = dict(payload)
-        if hasattr(self, "model_client_options") and self.model_client_options and "modelClientOptions" not in modified_payload:
+        if (
+            hasattr(self, "model_client_options")
+            and self.model_client_options
+            and "modelClientOptions" not in modified_payload
+        ):
             modified_payload["modelClientOptions"] = self.model_client_options
-        
+
         # Convert snake_case keys to camelCase for the API
         modified_payload = convert_dict_keys_to_camel_case(modified_payload)
-        
+
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self._log(f"\n==== EXECUTING {method.upper()} ====", level=3)
         self._log(
@@ -347,7 +351,7 @@ class Stagehand(StagehandBase):
         )
         self._log(f"Payload: {modified_payload}", level=3)
         self._log(f"Headers: {headers}", level=3)
-        
+
         async with client:
             try:
                 if not self.streamed_response:
@@ -362,12 +366,14 @@ class Stagehand(StagehandBase):
                         error_message = error_text.decode("utf-8")
                         self._log(f"Error: {error_message}", level=3)
                         return None
-                    
+
                     data = response.json()
                     if data.get("success"):
                         return data.get("data", {}).get("result")
                     else:
-                        raise RuntimeError(f"Request failed: {data.get('error', 'Unknown error')}")
+                        raise RuntimeError(
+                            f"Request failed: {data.get('error', 'Unknown error')}"
+                        )
 
                 # Handle streaming response
                 async with client.stream(
@@ -430,7 +436,7 @@ class Stagehand(StagehandBase):
             "Server connection closed without sending 'finished' message"
         )
 
-    async def _handle_log(self, msg: Dict[str, Any]):
+    async def _handle_log(self, msg: dict[str, Any]):
         """
         Handle a log line from the server. If on_log is set, call it asynchronously.
         """

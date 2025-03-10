@@ -56,11 +56,13 @@ def test_act_command(stagehand_client):
 def test_observe_command(stagehand_client):
     """Test the observe command functionality."""
     stagehand_client.page.goto("https://www.google.com")
-    result = stagehand_client.page.observe(ObserveOptions(instruction="find the search input box"))
+    result = stagehand_client.page.observe(
+        ObserveOptions(instruction="find the search input box")
+    )
     assert result is not None
     assert len(result) > 0
-    assert hasattr(result[0], 'selector')
-    assert hasattr(result[0], 'description')
+    assert hasattr(result[0], "selector")
+    assert hasattr(result[0], "description")
 
 
 def test_extract_command(stagehand_client):
@@ -68,7 +70,7 @@ def test_extract_command(stagehand_client):
     stagehand_client.page.goto("https://www.google.com")
     result = stagehand_client.page.extract("title")
     assert result is not None
-    assert hasattr(result, 'extraction')
+    assert hasattr(result, "extraction")
     assert isinstance(result.extraction, str)
     assert result.extraction is not None
 
