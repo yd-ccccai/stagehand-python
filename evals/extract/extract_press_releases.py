@@ -19,7 +19,8 @@ class PressReleases(BaseModel):
 
 async def extract_press_releases(model_name: str, logger, use_text_extract: bool):
     """
-    Extract press releases from the dummy press releases page using the Stagehand client.
+    Extract press releases from the dummy press releases page using the Stagehand
+    client.
 
     Args:
         model_name (str): Name of the AI model to use.
@@ -56,7 +57,10 @@ async def extract_press_releases(model_name: str, logger, use_text_extract: bool
         # TODO - FAILING - extract is likely timing out
         raw_result = await stagehand.page.extract(
             ExtractOptions(
-                instruction="extract the title and corresponding publish date of EACH AND EVERY press releases on this page. DO NOT MISS ANY PRESS RELEASES.",
+                instruction=(
+                    "extract the title and corresponding publish date of EACH AND EVERY "
+                    "press releases on this page. DO NOT MISS ANY PRESS RELEASES."
+                ),
                 schemaDefinition=PressReleases.model_json_schema(),
                 useTextExtract=use_text_extract,
             )

@@ -87,7 +87,10 @@ async def main():
     if len(observed) > 0:
         element = observed[0]
         console.print("✅ [success]Found element:[/] News button")
+        console.print("\n▶️ [highlight] Performing action on observed element")
         await page.act(element)
+        console.print("✅ [success]Performing Action:[/] Action completed successfully")
+
     else:
         console.print("❌ [error]No element found[/]")
 

@@ -6,10 +6,12 @@ from stagehand.config import StagehandConfig
 
 async def init_stagehand(model_name: str, logger, dom_settle_timeout_ms: int = 3000):
     """
-    Initialize a Stagehand client with the given model name, logger, and DOM settle timeout.
+    Initialize a Stagehand client with the given model name, logger, and DOM settle
+    timeout.
 
-    This function creates a configuration from environment variables, initializes the Stagehand client,
-    and returns a tuple of (stagehand, init_response). The init_response contains debug and session URLs.
+    This function creates a configuration from environment variables, initializes
+    the Stagehand client, and returns a tuple of (stagehand, init_response).
+    The init_response contains debug and session URLs.
 
     Args:
         model_name (str): The name of the AI model to use.
@@ -37,7 +39,8 @@ async def init_stagehand(model_name: str, logger, dom_settle_timeout_ms: int = 3
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
     )
 
-    # Create a Stagehand client with the configuration; server_url is taken from environment variables.
+    # Create a Stagehand client with the configuration; server_url is taken from
+    # environment variables.
     stagehand = Stagehand(
         config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2
     )

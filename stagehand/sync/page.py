@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from playwright.sync_api import Page
 
@@ -13,15 +13,17 @@ from ..schemas import (
 
 
 class SyncStagehandPage:
-    """Synchronous wrapper around Playwright Page that integrates with Stagehand server"""
+    """Synchronous wrapper around Playwright Page that integrates with Stagehand
+    server"""
 
     def __init__(self, page: Page, stagehand_client):
         """
-        Initialize a SyncStagehandPage instance.
+                Initialize a SyncStagehandPage instance.
 
-        Args:
-            page (Page): The underlying Playwright page.
-            stagehand_client: The sync client used to interface with the Stagehand server.
+                Args:
+                    page (Page): The underlying Playwright page.
+                    stagehand_client: The sync client used to interface with the Stagehand
+        server.
         """
         self.page = page
         self._stagehand = stagehand_client
@@ -32,19 +34,20 @@ class SyncStagehandPage:
         *,
         referer: Optional[str] = None,
         timeout: Optional[int] = None,
-        wait_until: Optional[str] = None
+        wait_until: Optional[str] = None,
     ):
         """
-        Navigate to URL using the Stagehand server synchronously.
+                Navigate to URL using the Stagehand server synchronously.
 
-        Args:
-            url (str): The URL to navigate to.
-            referer (Optional[str]): Optional referer URL.
-            timeout (Optional[int]): Optional navigation timeout in milliseconds.
-            wait_until (Optional[str]): Optional wait condition; one of ('load', 'domcontentloaded', 'networkidle', 'commit').
+                Args:
+                    url (str): The URL to navigate to.
+                    referer (Optional[str]): Optional referer URL.
+                    timeout (Optional[int]): Optional navigation timeout in milliseconds.
+                    wait_until (Optional[str]): Optional wait condition; one of ('load',
+        'domcontentloaded', 'networkidle', 'commit').
 
-        Returns:
-            The result from the Stagehand server's navigation execution.
+                Returns:
+                    The result from the Stagehand server's navigation execution.
         """
         options = {}
         if referer is not None:
@@ -64,19 +67,25 @@ class SyncStagehandPage:
 
     def act(self, options: Union[str, ActOptions, ObserveResult]) -> ActResult:
         """
-        Execute an AI action via the Stagehand server synchronously.
+                Execute an AI action via the Stagehand server synchronously.
 
-        Args:
-            options (Union[str, ActOptions, ObserveResult]):
-                - A string with the action command to be executed by the AI
-                - An ActOptions object encapsulating the action command and optional parameters
-                - An ObserveResult with selector and method fields for direct execution without LLM
+                Args:
+                    options (Union[str, ActOptions, ObserveResult]):
+                        - A string with the action command to be executed by the AI
+                        - An ActOptions object encapsulating the action command and optional
+        parameters
+                        - An ObserveResult with selector and method fields for direct execution
+        without LLM
 
-        Returns:
-            ActResult: The result from the Stagehand server's action execution.
+                Returns:
+                    ActResult: The result from the Stagehand server's action execution.
         """
         # Check if options is an ObserveResult with both selector and method
-        if isinstance(options, ObserveResult) and hasattr(options, "selector") and hasattr(options, "method"):
+        if (
+            isinstance(options, ObserveResult)
+            and hasattr(options, "selector")
+            and hasattr(options, "method")
+        ):
             # For ObserveResult, we directly pass it to the server which will
             # execute the method against the selector
             payload = options.model_dump(exclude_none=True, by_alias=True)
@@ -93,16 +102,18 @@ class SyncStagehandPage:
             return ActResult(**result)
         return result
 
-    def observe(self, options: Union[str, ObserveOptions]) -> List[ObserveResult]:
+    def observe(self, options: Union[str, ObserveOptions]) -> list[ObserveResult]:
         """
-        Make an AI observation via the Stagehand server synchronously.
+                Make an AI observation via the Stagehand server synchronously.
 
-        Args:
-            options (Union[str, ObserveOptions]): Either a string with the observation instruction
-                or a Pydantic model encapsulating the observation instruction.
+                Args:
+                    options (Union[str, ObserveOptions]): Either a string with the observation
+        instruction
+                        or a Pydantic model encapsulating the observation instruction.
 
-        Returns:
-            List[ObserveResult]: A list of observation results from the Stagehand server.
+                Returns:
+                    list[ObserveResult]: A list of observation results from the Stagehand
+        server.
         """
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
@@ -121,13 +132,14 @@ class SyncStagehandPage:
 
     def extract(self, options: Union[str, ExtractOptions]) -> ExtractResult:
         """
-        Extract data using AI via the Stagehand server synchronously.
+                Extract data using AI via the Stagehand server synchronously.
 
-        Args:
-            options (Union[str, ExtractOptions]): The extraction options describing what to extract and how.
+                Args:
+                    options (Union[str, ExtractOptions]): The extraction options describing
+        what to extract and how.
 
-        Returns:
-            ExtractResult: The result from the Stagehand server's extraction execution.
+                Returns:
+                    ExtractResult: The result from the Stagehand server's extraction execution.
         """
         # Convert string to ExtractOptions if needed
         if isinstance(options, str):
@@ -150,4 +162,4 @@ class SyncStagehandPage:
         Returns:
             The attribute from the underlying Playwright page.
         """
-        return getattr(self.page, name) 
+        return getattr(self.page, name)
