@@ -151,13 +151,14 @@ class Stagehand(StagehandBase):
                 timeout=self.timeout_settings
             )
 
-        # Check server health
-        await self._check_server_health()
-
         # Create session if we don't have one
         if not self.session_id:
             await self._create_session()
             self._log(f"Created new session: {self.session_id}", level=3)
+
+        ###
+        # TODO: throw log for unauthorized (401) key not whitelisted
+        ###
 
         # Start Playwright and connect to remote
         self._log("Starting Playwright...", level=3)
@@ -236,42 +237,6 @@ class Stagehand(StagehandBase):
             self._client = None
 
         self._closed = True
-
-    async def _check_server_health(self, timeout: int = 10):
-        """
-        Ping /healthcheck to verify the server is available.
-        Uses exponential backoff for retries.
-        """
-        start = time.time()
-        attempt = 0
-        while True:
-            try:
-                client = self.httpx_client or httpx.AsyncClient(
-                    timeout=self.timeout_settings
-                )
-                async with client:
-                    headers = {
-                        "x-bb-api-key": self.browserbase_api_key,
-                    }
-                    resp = await client.get(
-                        f"{self.server_url}/healthcheck", headers=headers
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if data.get("status") == "ok":
-                            self._log("Healthcheck passed. Server is running.", level=3)
-                            return
-            except Exception as e:
-                self._log(f"Healthcheck error: {str(e)}", level=3)
-
-            if time.time() - start > timeout:
-                raise TimeoutError(f"Server not responding after {timeout} seconds.")
-
-            wait_time = min(
-                2**attempt * 0.5, 5.0
-            )  # Exponential backoff, capped at 5 seconds
-            await asyncio.sleep(wait_time)
-            attempt += 1
 
     async def _create_session(self):
         """
