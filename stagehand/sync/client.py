@@ -72,13 +72,14 @@ class Stagehand(StagehandBase):
         if not self._client:
             self._client = requests.Session()
 
-        # Check server health
-        self._check_server_health()
-
         # Create session if we don't have one
         if not self.session_id:
             self._create_session()
             self._log(f"Created new session: {self.session_id}", level=3)
+
+        ###
+        # TODO: throw log for unauthorized (401) key not whitelisted
+        ###
 
         # Start Playwright and connect to remote
         self._log("Starting Playwright...", level=3)
@@ -151,35 +152,6 @@ class Stagehand(StagehandBase):
             self._client = None
 
         self._closed = True
-
-    def _check_server_health(self, timeout: int = 10):
-        """
-        Check server health synchronously with exponential backoff.
-        """
-        start = time.time()
-        attempt = 0
-        while True:
-            try:
-                headers = {
-                    "x-bb-api-key": self.browserbase_api_key,
-                }
-                resp = self._client.get(
-                    f"{self.server_url}/healthcheck", headers=headers
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("status") == "ok":
-                        self._log("Healthcheck passed. Server is running.", level=3)
-                        return
-            except Exception as e:
-                self._log(f"Healthcheck error: {str(e)}", level=3)
-
-            if time.time() - start > timeout:
-                raise TimeoutError(f"Server not responding after {timeout} seconds.")
-
-            wait_time = min(2**attempt * 0.5, 5.0)
-            time.sleep(wait_time)
-            attempt += 1
 
     def _create_session(self):
         """
