@@ -9,6 +9,7 @@ from rich.theme import Theme
 
 from stagehand.client import Stagehand
 from stagehand.config import StagehandConfig
+from stagehand.schemas import AgentConfig, AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
@@ -44,6 +45,10 @@ async def main():
         headless=False,
         dom_settle_timeout_ms=3000,
         model_name="gpt-4o",
+        self_heal=True,
+        wait_for_captcha_solves=True,
+        act_timeout_ms=60000,  # 60 seconds timeout for actions
+        system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
     )
 
@@ -82,6 +87,11 @@ async def main():
     await page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
 
+    # Take a screenshot of the search results
+    console.print("\n▶️ [highlight] Taking a screenshot[/] of search results")
+    screenshot_data = await page.screenshot({"fullPage": True})
+    console.print("✅ [success]Screenshot taken (Base64 data available)[/]")
+
     console.print("\n▶️ [highlight] Observing page[/] for news button")
     observed = await page.observe("find the news button on the page")
     if len(observed) > 0:
@@ -98,6 +108,29 @@ async def main():
     data = await page.extract("extract the first result from the search")
     console.print("📊 [info]Extracted data:[/]")
     console.print_json(f"{data.model_dump_json()}")
+
+    # Demonstrate the agent_execute functionality
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
+    
+    # Configure the agent
+    agent_config = AgentConfig(
+        provider=AgentProvider.OPENAI,
+        model="gpt-4o",
+        instructions="You are a helpful web navigation assistant that helps users find information.",
+    )
+    
+    # Define the task for the agent
+    execute_options = AgentExecuteOptions(
+        instruction="Navigate to wikipedia.org and search for 'artificial intelligence', then extract the first paragraph of the article.",
+        max_steps=10,
+        auto_screenshot=True,
+    )
+    
+    # Execute the agent task
+    agent_result = await page.agent_execute(agent_config, execute_options)
+    
+    console.print("📊 [info]Agent execution result:[/]")
+    console.print_json(f"{agent_result.model_dump_json()}")
 
     # Close the session
     console.print("\n⏹️ [warning]Closing session...[/]")

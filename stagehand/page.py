@@ -5,6 +5,9 @@ from playwright.async_api import Page
 from .schemas import (
     ActOptions,
     ActResult,
+    AgentConfig,
+    AgentExecuteOptions,
+    AgentExecuteResult,
     ExtractOptions,
     ExtractResult,
     ObserveOptions,
@@ -134,30 +137,85 @@ class StagehandPage:
             return [ObserveResult(**result)]
         return []
 
-    async def extract(self, options: Union[str, ExtractOptions]) -> ExtractResult:
+    async def extract(self, options: Union[str, ExtractOptions] = None) -> ExtractResult:
         """
         Extract data using AI via the Stagehand server.
 
-        Expects an ExtractOptions Pydantic object that includes a JSON schema (or Pydantic model)
-        for validation.
-
         Args:
-            options (ExtractOptions): The extraction options describing what to extract and how.
+            options (Union[str, ExtractOptions], optional): The extraction options describing what to extract and how.
+                This can be either a string with an instruction or an ExtractOptions object.
+                If None, extracts the entire page content.
                 See `stagehand.schemas.ExtractOptions` for details on expected fields.
 
         Returns:
-            Any: The result from the Stagehand server's extraction execution.
+            ExtractResult: The result from the Stagehand server's extraction execution.
         """
+        # Allow for no options to extract the entire page
+        if options is None:
+            payload = {}
         # Convert string to ExtractOptions if needed
-        if isinstance(options, str):
+        elif isinstance(options, str):
             options = ExtractOptions(instruction=options)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
+        # Otherwise, it should be an ExtractOptions object
+        else:
+            payload = options.model_dump(exclude_none=True, by_alias=True)
 
-        payload = options.model_dump(exclude_none=True, by_alias=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("extract", payload)
         if isinstance(result, dict):
             return ExtractResult(**result)
+        return result
+    
+    async def agent_execute(
+        self, agent_config: AgentConfig, execute_options: AgentExecuteOptions
+    ) -> AgentExecuteResult:
+        """
+        Execute a task using an autonomous agent via the Stagehand server.
+        
+        Args:
+            agent_config (AgentConfig): Configuration for the agent, including provider and model.
+            execute_options (AgentExecuteOptions): Options for execution, including the instruction.
+            
+        Returns:
+            AgentExecuteResult: The result of the agent execution.
+        """
+        payload = {
+            "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),
+            "executeOptions": execute_options.model_dump(exclude_none=True, by_alias=True),
+        }
+        
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("agentExecute", payload)
+        
+        if isinstance(result, dict):
+            return AgentExecuteResult(**result)
+        return result
+    
+    async def screenshot(self, options: Optional[dict] = None) -> str:
+        """
+        Take a screenshot of the current page via the Stagehand server.
+        
+        Args:
+            options (Optional[dict]): Optional screenshot options.
+                May include:
+                - type: "png" or "jpeg" (default: "png")
+                - fullPage: whether to take a full page screenshot (default: False)
+                - quality: for jpeg only, 0-100 (default: 80)
+                - clip: viewport clip rectangle
+                - omitBackground: whether to hide default white background (default: False)
+                
+        Returns:
+            str: Base64-encoded screenshot data.
+        """
+        payload = options or {}
+        
+        lock = self._stagehand._get_lock_for_session()
+        async with lock:
+            result = await self._stagehand._execute("screenshot", payload)
+        
         return result
 
     # Forward other Page methods to underlying Playwright page
