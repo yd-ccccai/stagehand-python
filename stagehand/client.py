@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import signal
+import sys
 import time
 from collections.abc import Awaitable
 from typing import Any, Callable, Optional
@@ -29,6 +31,9 @@ class Stagehand(StagehandBase):
 
     # Dictionary to store one lock per session_id
     _session_locks = {}
+    
+    # Flag to track if cleanup has been called
+    _cleanup_called = False
 
     def __init__(
         self,
@@ -115,6 +120,9 @@ class Stagehand(StagehandBase):
                 raise ValueError(
                     "browserbase_project_id is required (or set BROWSERBASE_PROJECT_ID in env)."
                 )
+                
+        # Register signal handlers for graceful shutdown
+        self._register_signal_handlers()
 
     def _get_lock_for_session(self) -> asyncio.Lock:
         """
@@ -428,3 +436,40 @@ class Stagehand(StagehandBase):
                 logger.warning(formatted_msg)
             else:
                 logger.debug(formatted_msg)
+
+    def _register_signal_handlers(self):
+        """Register signal handlers for SIGINT and SIGTERM to ensure proper cleanup."""
+        def cleanup_handler(sig, frame):
+            if self.__class__._cleanup_called:
+                return
+            
+            self.__class__._cleanup_called = True
+            print(f"\n[{signal.Signals(sig).name}] received. Ending Browserbase session...")
+            
+            try:
+                # For more niceness, try to end the session synchronously
+                if self.session_id:
+                    import requests
+                    headers = {
+                        "x-bb-api-key": self.browserbase_api_key,
+                        "x-bb-project-id": self.browserbase_project_id,
+                        "Content-Type": "application/json",
+                    }
+                    try:
+                        requests.post(
+                            f"{self.server_url}/sessions/{self.session_id}/end",
+                            json={"sessionId": self.session_id},
+                            headers=headers,
+                            timeout=3.0  # Short timeout to avoid hanging
+                        )
+                        print(f"Session {self.session_id} ended successfully")
+                    except Exception:
+                        # Ignore any errors during cleanup
+                        pass
+            finally:
+                # Just exit immediately with a successful status code
+                sys.exit(0)
+        
+        # Register signal handlers
+        signal.signal(signal.SIGINT, cleanup_handler)
+        signal.signal(signal.SIGTERM, cleanup_handler)

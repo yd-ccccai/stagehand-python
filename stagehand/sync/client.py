@@ -1,9 +1,10 @@
 import json
 import logging
-import time
 from typing import Any, Callable, Optional
 
 import requests
+import signal
+import sys
 from playwright.sync_api import sync_playwright
 
 from ..base import StagehandBase
@@ -58,6 +59,32 @@ class Stagehand(StagehandBase):
         self._playwright_page = None
         self.model_client_options = model_client_options
         self.streamed_response = True  # Default to True for streamed responses
+        
+        # Register signal handlers for graceful shutdown
+        self._register_signal_handlers()
+
+    def _register_signal_handlers(self):
+        """Register signal handlers for SIGINT and SIGTERM to ensure proper cleanup."""
+        def cleanup_handler(sig, frame):
+            if self.__class__._cleanup_called:
+                return
+            
+            self.__class__._cleanup_called = True
+            print(f"\n[{signal.Signals(sig).name}] received. Ending Browserbase session...")
+            
+            try:
+                # For the sync client, we can directly call close()
+                self.close()
+                print(f"Session {self.session_id} ended successfully")
+            except Exception as e:
+                print(f"Error ending Browserbase session: {str(e)}")
+            finally:
+                # Exit explicitly once cleanup is done
+                sys.exit(0)
+        
+        # Register signal handlers
+        signal.signal(signal.SIGINT, cleanup_handler)
+        signal.signal(signal.SIGTERM, cleanup_handler)
 
     def init(self):
         """
