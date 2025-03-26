@@ -109,7 +109,7 @@ async def main():
     console.print("📊 [info]Extracted data:[/]")
     console.print_json(f"{data.model_dump_json()}")
 
-    # Demonstrate the agent_execute functionality
+    # Demonstrate the agent functionality
     console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
     
     # Configure the agent
@@ -126,8 +126,8 @@ async def main():
         auto_screenshot=True,
     )
     
-    # Execute the agent task
-    agent_result = await page.agent_execute(agent_config, execute_options)
+    # Execute the agent task using the new agent interface
+    agent_result = await stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")
     console.print_json(f"{agent_result.model_dump_json()}")

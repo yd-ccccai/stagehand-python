@@ -161,30 +161,6 @@ class SyncStagehandPage:
             return ExtractResult(**result)
         return result
         
-    def agent_execute(
-        self, agent_config: AgentConfig, execute_options: AgentExecuteOptions
-    ) -> AgentExecuteResult:
-        """
-        Execute a task using an autonomous agent via the Stagehand server synchronously.
-        
-        Args:
-            agent_config (AgentConfig): Configuration for the agent, including provider and model.
-            execute_options (AgentExecuteOptions): Options for execution, including the instruction.
-            
-        Returns:
-            AgentExecuteResult: The result of the agent execution.
-        """
-        payload = {
-            "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),
-            "executeOptions": execute_options.model_dump(exclude_none=True, by_alias=True),
-        }
-        
-        result = self._stagehand._execute("agentExecute", payload)
-        
-        if isinstance(result, dict):
-            return AgentExecuteResult(**result)
-        return result
-    
     def screenshot(self, options: Optional[dict] = None) -> str:
         """
         Take a screenshot of the current page via the Stagehand server synchronously.

@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 from ..base import StagehandBase
 from ..config import StagehandConfig
 from ..utils import convert_dict_keys_to_camel_case, default_log_handler
+from .agent import SyncAgent
 from .page import SyncStagehandPage
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,8 @@ class Stagehand(StagehandBase):
         self._browser = None
         self._context = None
         self._playwright_page = None
+        self.page: Optional[SyncStagehandPage] = None
+        self.agent: Optional[SyncAgent] = None
         self.model_client_options = model_client_options
         self.streamed_response = True  # Default to True for streamed responses
 
@@ -116,6 +119,10 @@ class Stagehand(StagehandBase):
         self._log("Wrapping Playwright page in SyncStagehandPage", level=3)
         self.page = SyncStagehandPage(self._playwright_page, self)
 
+        # Initialize agent
+        self._log("Initializing SyncAgent", level=3)
+        self.agent = SyncAgent(self)
+        
         self._initialized = True
 
     def close(self):

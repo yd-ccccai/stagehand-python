@@ -123,8 +123,8 @@ def main():
         auto_screenshot=True,
     )
     
-    # Execute the agent task
-    agent_result = stagehand.page.agent_execute(agent_config, execute_options)
+    # Execute the agent task using the new agent interface
+    agent_result = stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")
     console.print_json(f"{agent_result.model_dump_json()}")

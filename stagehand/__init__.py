@@ -1,3 +1,4 @@
+from .agent import Agent
 from .client import Stagehand
 from .config import StagehandConfig
 from .page import StagehandPage
@@ -18,6 +19,7 @@ from .schemas import (
 __version__ = "0.2.2"
 
 __all__ = [
+    "Agent",
     "Stagehand",
     "StagehandConfig",
     "StagehandPage",
