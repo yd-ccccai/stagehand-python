@@ -8,7 +8,6 @@ from rich.theme import Theme
 
 from stagehand.config import StagehandConfig
 from stagehand.sync import Stagehand
-from stagehand.schemas import AgentConfig, AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
@@ -105,29 +104,6 @@ def main():
     data = stagehand.page.extract("extract the first result from the search")
     console.print("📊 [info]Extracted data:[/]")
     console.print_json(f"{data.model_dump_json()}")
-    
-    # Demonstrate the agent_execute functionality
-    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
-    
-    # Configure the agent
-    agent_config = AgentConfig(
-        provider=AgentProvider.OPENAI,
-        model="gpt-4o",
-        instructions="You are a helpful web navigation assistant that helps users find information.",
-    )
-    
-    # Define the task for the agent
-    execute_options = AgentExecuteOptions(
-        instruction="Navigate to wikipedia.org and search for 'artificial intelligence', then extract the first paragraph of the article.",
-        max_steps=10,
-        auto_screenshot=True,
-    )
-    
-    # Execute the agent task using the new agent interface
-    agent_result = stagehand.agent.execute(agent_config, execute_options)
-    
-    console.print("📊 [info]Agent execution result:[/]")
-    console.print_json(f"{agent_result.model_dump_json()}")
 
     # Close the session
     console.print("\n⏹️ [warning]Closing session...[/]")
