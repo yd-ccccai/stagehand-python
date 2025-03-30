@@ -178,3 +178,60 @@ class ObserveResult(StagehandBaseModel):
         This allows usage like result["selector"] in addition to result.selector
         """
         return getattr(self, key)
+
+
+class AgentProvider(str, Enum):
+    """Supported agent providers"""
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+
+
+class AgentConfig(StagehandBaseModel):
+    """
+    Configuration for agent execution.
+    
+    Attributes:
+        provider (Optional[AgentProvider]): The provider to use (openai or anthropic).
+        model (Optional[str]): The model name to use.
+        instructions (Optional[str]): Custom instructions for the agent.
+        options (Optional[dict[str, Any]]): Additional provider-specific options.
+    """
+    
+    provider: Optional[AgentProvider] = None
+    model: Optional[str] = None
+    instructions: Optional[str] = None
+    options: Optional[dict[str, Any]] = None
+
+
+class AgentExecuteOptions(StagehandBaseModel):
+    """
+    Options for agent execution.
+    
+    Attributes:
+        instruction (str): The task instruction for the agent.
+        max_steps (Optional[int]): Maximum number of steps the agent can take.
+        auto_screenshot (Optional[bool]): Whether to automatically take screenshots between steps.
+        wait_between_actions (Optional[int]): Milliseconds to wait between actions.
+        context (Optional[str]): Additional context for the agent.
+    """
+    
+    instruction: str = Field(..., description="The task instruction for the agent.")
+    max_steps: Optional[int] = None
+    auto_screenshot: Optional[bool] = None
+    wait_between_actions: Optional[int] = None
+    context: Optional[str] = None
+
+
+class AgentExecuteResult(StagehandBaseModel):
+    """
+    Result of agent execution.
+    
+    Attributes:
+        success (bool): Whether the execution was successful.
+        steps (Optional[list[dict[str, Any]]]): Steps taken by the agent.
+        result (Optional[str]): Final result message from the agent.
+    """
+    
+    success: bool = Field(..., description="Whether the execution was successful.")
+    steps: Optional[list[dict[str, Any]]] = None
+    result: Optional[str] = None
