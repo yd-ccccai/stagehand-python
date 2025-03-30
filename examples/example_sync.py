@@ -85,11 +85,6 @@ def main():
     stagehand.page.act("search for openai")
     stagehand.page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
-    
-    # Take a screenshot of the search results
-    console.print("\n▶️ [highlight] Taking a screenshot[/] of search results")
-    screenshot_data = stagehand.page.screenshot({"fullPage": True})
-    console.print("✅ [success]Screenshot taken (Base64 data available)[/]")
 
     console.print("\n▶️ [highlight] Observing page[/] for news button")
     observed = stagehand.page.observe("find the news button on the page")
