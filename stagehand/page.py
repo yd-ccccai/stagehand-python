@@ -5,9 +5,6 @@ from playwright.async_api import Page
 from .schemas import (
     ActOptions,
     ActResult,
-    AgentConfig,
-    AgentExecuteOptions,
-    AgentExecuteResult,
     ExtractOptions,
     ExtractResult,
     ObserveOptions,

@@ -9,7 +9,6 @@ import httpx
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
-from .agent import Agent
 from .base import StagehandBase
 from .config import StagehandConfig
 from .page import StagehandPage
@@ -114,7 +113,6 @@ class Stagehand(StagehandBase):
         self._context = None
         self._playwright_page = None
         self.page: Optional[StagehandPage] = None
-        self.agent: Optional[Agent] = None
 
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
@@ -208,10 +206,6 @@ class Stagehand(StagehandBase):
         # Wrap with StagehandPage
         self._log("Wrapping Playwright page in StagehandPage", level=3)
         self.page = StagehandPage(self._playwright_page, self)
-        
-        # Initialize agent
-        self._log("Initializing Agent", level=3)
-        self.agent = Agent(self)
 
         self._initialized = True
 
