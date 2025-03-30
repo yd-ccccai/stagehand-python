@@ -2,6 +2,7 @@ from .client import Stagehand
 from .config import StagehandConfig
 from .page import StagehandPage
 from .agent import Agent
+from .utils import configure_logging
 from .schemas import (
     ActOptions,
     ActResult,
@@ -23,6 +24,7 @@ __all__ = [
     "StagehandConfig",
     "StagehandPage",
     "Agent",
+    "configure_logging",
     "ActOptions",
     "ActResult",
     "AvailableModel",

@@ -16,6 +16,7 @@ class AvailableModel(str, Enum):
     GPT_4O_MINI = "gpt-4o-mini"
     CLAUDE_3_5_SONNET_LATEST = "claude-3-5-sonnet-latest"
     CLAUDE_3_7_SONNET_LATEST = "claude-3-7-sonnet-latest"
+    COMPUTER_USE_PREVIEW = "computer-use-preview"
 
 
 class StagehandBaseModel(BaseModel):

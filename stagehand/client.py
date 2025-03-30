@@ -448,6 +448,11 @@ class Stagehand(StagehandBase):
         """
         Internal logging with optional verbosity control.
         Maps internal level to Python logging levels.
+        
+        Verbosity levels:
+        - 1 (default): Important info (maps to INFO)
+        - 2: Warnings and additional information (maps to WARNING)
+        - 3: Detailed debug information (maps to DEBUG)
         """
         if self.verbose >= level:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -457,5 +462,5 @@ class Stagehand(StagehandBase):
                 logger.info(formatted_msg)
             elif level == 2:
                 logger.warning(formatted_msg)
-            else:
+            elif level == 3:
                 logger.debug(formatted_msg)

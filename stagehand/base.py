@@ -90,6 +90,8 @@ class StagehandBase(ABC):
             )
             self.act_timeout_ms = config.act_timeout_ms or act_timeout_ms
             self.system_prompt = config.system_prompt or system_prompt
+            # Use verbose from config if provided
+            self.verbose = config.verbose if config.verbose is not None else verbose
         else:
             self.browserbase_api_key = browserbase_api_key or os.getenv(
                 "BROWSERBASE_API_KEY"
@@ -105,6 +107,7 @@ class StagehandBase(ABC):
             self.wait_for_captcha_solves = wait_for_captcha_solves
             self.act_timeout_ms = act_timeout_ms
             self.system_prompt = system_prompt
+            self.verbose = verbose
 
         # Handle model-related settings directly
         self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
@@ -118,7 +121,6 @@ class StagehandBase(ABC):
         )
 
         self.on_log = on_log
-        self.verbose = verbose
         self.timeout_settings = timeout_settings or 180.0
 
         self._initialized = False
@@ -155,13 +157,19 @@ class StagehandBase(ABC):
     def _log(self, message: str, level: int = 1):
         """
         Internal logging helper that maps verbosity to logging levels.
+        
+        Verbosity levels:
+        - 1 (default): Important info (maps to INFO)
+        - 2: Warnings and additional information (maps to WARNING)
+        - 3: Detailed debug information (maps to DEBUG)
         """
         if self.verbose >= level:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             formatted_msg = f"{timestamp}::[stagehand] {message}"
+            
             if level == 1:
                 logger.info(formatted_msg)
             elif level == 2:
                 logger.warning(formatted_msg)
-            else:
+            elif level == 3:
                 logger.debug(formatted_msg)
