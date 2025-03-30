@@ -86,11 +86,6 @@ async def main():
     await page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
 
-    # Take a screenshot of the search results
-    console.print("\n▶️ [highlight] Taking a screenshot[/] of search results")
-    screenshot_data = await page.screenshot({"fullPage": True})
-    console.print("✅ [success]Screenshot taken (Base64 data available)[/]")
-
     console.print("\n▶️ [highlight] Observing page[/] for news button")
     observed = await page.observe("find the news button on the page")
     if len(observed) > 0:
