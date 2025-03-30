@@ -1,10 +1,20 @@
-from typing import Optional
+from typing import Optional, Dict
 
 from .schemas import (
     AgentConfig,
     AgentExecuteOptions,
     AgentExecuteResult,
+    AgentProvider,
 )
+
+
+# Model to provider mapping
+MODEL_TO_PROVIDER_MAP: Dict[str, AgentProvider] = {
+    "computer-use-preview": AgentProvider.OPENAI,
+    "claude-3-5-sonnet-20240620": AgentProvider.ANTHROPIC,
+    "claude-3-7-sonnet-20250219": AgentProvider.ANTHROPIC,
+    # Add more mappings as needed
+}
 
 
 class Agent:
@@ -34,6 +44,17 @@ class Agent:
         Returns:
             AgentExecuteResult: The result of the agent execution.
         """
+        # If provider is not set but model is, infer provider from model
+        if not agent_config.provider and agent_config.model and agent_config.model in MODEL_TO_PROVIDER_MAP:
+            agent_config.provider = MODEL_TO_PROVIDER_MAP[agent_config.model]
+        
+        # Ensure provider is correctly set as an enum if provided as a string
+        if agent_config.provider and isinstance(agent_config.provider, str):
+            try:
+                agent_config.provider = AgentProvider(agent_config.provider.lower())
+            except ValueError:
+                raise ValueError(f"Invalid provider: {agent_config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}")
+        
         payload = {
             "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),
             "executeOptions": execute_options.model_dump(exclude_none=True, by_alias=True),

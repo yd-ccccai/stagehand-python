@@ -370,6 +370,11 @@ class Stagehand(StagehandBase):
                         raise RuntimeError(
                             f"Request failed: {data.get('error', 'Unknown error')}"
                         )
+                
+                # log the whole request
+                self._log(f"Request: {modified_payload}", level=3)
+                self._log(f"Headers: {headers}", level=3)
+                self._log(f"URL: {self.server_url}/sessions/{self.session_id}/{method}", level=3)
 
                 # Handle streaming response
                 async with client.stream(

@@ -45,7 +45,7 @@ def main():
         project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
         headless=False,
         dom_settle_timeout_ms=3000,
-        model_name="computer-use-preview",  # Updated model name
+        model_name="gpt-4o",
         self_heal=True,
         wait_for_captcha_solves=True,
         act_timeout_ms=60000,  # 60 seconds timeout for actions
