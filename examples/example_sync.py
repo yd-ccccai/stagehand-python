@@ -43,6 +43,10 @@ def main():
         headless=False,
         dom_settle_timeout_ms=3000,
         model_name="gpt-4o",
+        self_heal=True,
+        wait_for_captcha_solves=True,
+        act_timeout_ms=60000,  # 60 seconds timeout for actions
+        system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
     )
 

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from stagehand.schemas import AvailableModel
 
@@ -21,6 +21,9 @@ class StagehandConfig(BaseModel):
         browserbase_session_id (Optional[str]): Session ID for resuming Browserbase sessions.
         model_name (Optional[str]): Name of the model to use.
         self_heal (Optional[bool]): Enable self-healing functionality.
+        wait_for_captcha_solves (Optional[bool]): Whether to wait for CAPTCHA to be solved.
+        act_timeout_ms (Optional[int]): Timeout for act commands (in milliseconds).
+        system_prompt (Optional[str]): System prompt to use for LLM interactions.
     """
 
     env: str = "BROWSERBASE"
@@ -56,6 +59,20 @@ class StagehandConfig(BaseModel):
     self_heal: Optional[bool] = Field(
         True, alias="selfHeal", description="Enable self-healing functionality"
     )
+    wait_for_captcha_solves: Optional[bool] = Field(
+        False, 
+        alias="waitForCaptchaSolves", 
+        description="Whether to wait for CAPTCHA to be solved"
+    )
+    act_timeout_ms: Optional[int] = Field(
+        None,
+        alias="actTimeoutMs",
+        description="Timeout for act commands (in milliseconds)"
+    )
+    system_prompt: Optional[str] = Field(
+        None,
+        alias="systemPrompt",
+        description="System prompt to use for LLM interactions"
+    )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)

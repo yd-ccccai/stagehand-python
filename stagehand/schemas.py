@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, ConfigDict
 
 # Default extraction schema that matches the TypeScript version
 DEFAULT_EXTRACT_SCHEMA = {
@@ -21,12 +21,13 @@ class AvailableModel(str, Enum):
 class StagehandBaseModel(BaseModel):
     """Base model for all Stagehand models with camelCase conversion support"""
 
-    class Config:
-        populate_by_name = True  # Allow accessing fields by their Python name
-        alias_generator = lambda field_name: "".join(
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow accessing fields by their Python name
+        alias_generator=lambda field_name: "".join(
             [field_name.split("_")[0]]
             + [word.capitalize() for word in field_name.split("_")[1:]]
-        )  # snake_case to camelCase
+        ),  # snake_case to camelCase
+    )
 
 
 class ActOptions(StagehandBaseModel):
@@ -35,15 +36,19 @@ class ActOptions(StagehandBaseModel):
 
     Attributes:
         action (str): The action command to be executed by the AI.
-        variables: Optional[dict[str, str]] = None
-        model_name: Optional[AvailableModel] = None
-        slow_dom_based_act: Optional[bool] = None
+        variables (Optional[dict[str, str]]): Key-value pairs for variable substitution.
+        model_name (Optional[AvailableModel]): The model to use for processing.
+        slow_dom_based_act (Optional[bool]): Whether to use DOM-based action execution.
+        dom_settle_timeout_ms (Optional[int]): Additional time for DOM to settle after an action.
+        timeout_ms (Optional[int]): Timeout for the action in milliseconds.
     """
 
     action: str = Field(..., description="The action command to be executed by the AI.")
     variables: Optional[dict[str, str]] = None
     model_name: Optional[AvailableModel] = None
     slow_dom_based_act: Optional[bool] = None
+    dom_settle_timeout_ms: Optional[int] = None
+    timeout_ms: Optional[int] = None
 
 
 class ActResult(StagehandBaseModel):
@@ -67,11 +72,12 @@ class ExtractOptions(StagehandBaseModel):
 
     Attributes:
         instruction (str): Instruction specifying what data to extract using AI.
-        model_name: Optional[AvailableModel] = None
-        selector: Optional[str] = None
+        model_name (Optional[AvailableModel]): The model to use for processing.
+        selector (Optional[str]): CSS selector to limit extraction to.
         schema_definition (Union[dict[str, Any], type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
             Note: If passing a Pydantic model, invoke its .model_json_schema() method to ensure the schema is JSON serializable.
-        use_text_extract: Optional[bool] = None
+        use_text_extract (Optional[bool]): Whether to use text-based extraction.
+        dom_settle_timeout_ms (Optional[int]): Additional time for DOM to settle before extraction.
     """
 
     instruction: str = Field(
@@ -86,6 +92,7 @@ class ExtractOptions(StagehandBaseModel):
         description="A JSON schema or Pydantic model that defines the structure of the expected data.",
     )
     use_text_extract: Optional[bool] = True
+    dom_settle_timeout_ms: Optional[int] = None
 
     @field_serializer("schema_definition")
     def serialize_schema_definition(
@@ -98,8 +105,7 @@ class ExtractOptions(StagehandBaseModel):
             return schema_definition.model_json_schema()
         return schema_definition
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ExtractResult(StagehandBaseModel):
@@ -113,8 +119,7 @@ class ExtractResult(StagehandBaseModel):
     # This class is intentionally left without fields so it can accept
     # any fields from the extraction result based on the schema
 
-    class Config:
-        extra = "allow"  # Allow any extra fields
+    model_config = ConfigDict(extra="allow")  # Allow any extra fields
 
     def __getitem__(self, key):
         """
@@ -130,10 +135,11 @@ class ObserveOptions(StagehandBaseModel):
 
     Attributes:
         instruction (str): Instruction detailing what the AI should observe.
-        model_name: Optional[AvailableModel] = None
-        only_visible: Optional[bool] = None
-        return_action: Optional[bool] = None
-        draw_overlay: Optional[bool] = None
+        model_name (Optional[AvailableModel]): The model to use for processing.
+        only_visible (Optional[bool]): Whether to only consider visible elements.
+        return_action (Optional[bool]): Whether to include action information in the result.
+        draw_overlay (Optional[bool]): Whether to draw an overlay on observed elements.
+        dom_settle_timeout_ms (Optional[int]): Additional time for DOM to settle before observation.
     """
 
     instruction: str = Field(
@@ -143,11 +149,19 @@ class ObserveOptions(StagehandBaseModel):
     model_name: Optional[AvailableModel] = None
     return_action: Optional[bool] = None
     draw_overlay: Optional[bool] = None
+    dom_settle_timeout_ms: Optional[int] = None
 
 
 class ObserveResult(StagehandBaseModel):
     """
     Result of the 'observe' command.
+    
+    Attributes:
+        selector (str): The selector of the observed element.
+        description (str): The description of the observed element.
+        backend_node_id (Optional[int]): The backend node ID.
+        method (Optional[str]): The method to execute.
+        arguments (Optional[list[str]]): The arguments for the method.
     """
 
     selector: str = Field(..., description="The selector of the observed element.")

@@ -41,6 +41,10 @@ class TestClientInitialization:
             debug_dom=True,
             headless=True,
             enable_caching=True,
+            self_heal=True,
+            wait_for_captcha_solves=True,
+            act_timeout_ms=30000,
+            system_prompt="Custom system prompt for testing",
         )
 
         client = Stagehand(config=config, server_url="http://test-server.com")
@@ -54,6 +58,14 @@ class TestClientInitialization:
         assert client.debug_dom is True
         assert client.headless is True
         assert client.enable_caching is True
+        assert hasattr(client, "self_heal")
+        assert client.self_heal is True
+        assert hasattr(client, "wait_for_captcha_solves")
+        assert client.wait_for_captcha_solves is True
+        assert hasattr(client, "act_timeout_ms")
+        assert client.act_timeout_ms == 30000
+        assert hasattr(client, "system_prompt")
+        assert client.system_prompt == "Custom system prompt for testing"
 
     def test_config_priority_over_direct_params(self):
         """Test that config parameters take precedence over direct parameters."""

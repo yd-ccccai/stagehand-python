@@ -33,9 +33,33 @@ class StagehandBase(ABC):
         timeout_settings: Optional[float] = None,
         stream_response: Optional[bool] = None,
         model_client_options: Optional[dict[str, Any]] = None,
+        self_heal: Optional[bool] = None,
+        wait_for_captcha_solves: Optional[bool] = None,
+        act_timeout_ms: Optional[int] = None,
+        system_prompt: Optional[str] = None,
     ):
         """
         Initialize the Stagehand client with common configuration.
+        
+        Args:
+            config (Optional[StagehandConfig]): Configuration object that can provide all settings.
+            server_url (Optional[str]): URL of the Stagehand server.
+            session_id (Optional[str]): Existing session ID to resume.
+            browserbase_api_key (Optional[str]): Browserbase API key.
+            browserbase_project_id (Optional[str]): Browserbase project ID.
+            model_api_key (Optional[str]): Model provider API key.
+            on_log (Optional[Callable]): Callback for log events.
+            verbose (int): Verbosity level.
+            model_name (Optional[str]): Name of the model to use.
+            dom_settle_timeout_ms (Optional[int]): Time for DOM to settle in ms.
+            debug_dom (Optional[bool]): Whether to enable DOM debugging.
+            timeout_settings (Optional[float]): Request timeout in seconds.
+            stream_response (Optional[bool]): Whether to stream responses.
+            model_client_options (Optional[dict]): Options for the model client.
+            self_heal (Optional[bool]): Whether to enable self-healing.
+            wait_for_captcha_solves (Optional[bool]): Whether to wait for CAPTCHA solves.
+            act_timeout_ms (Optional[int]): Timeout for act commands in ms.
+            system_prompt (Optional[str]): System prompt for LLM interactions.
         """
         self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
 
@@ -58,6 +82,14 @@ class StagehandBase(ABC):
             self.debug_dom = (
                 config.debug_dom if config.debug_dom is not None else debug_dom
             )
+            self.self_heal = (
+                config.self_heal if config.self_heal is not None else self_heal
+            )
+            self.wait_for_captcha_solves = (
+                config.wait_for_captcha_solves if config.wait_for_captcha_solves is not None else wait_for_captcha_solves
+            )
+            self.act_timeout_ms = config.act_timeout_ms or act_timeout_ms
+            self.system_prompt = config.system_prompt or system_prompt
         else:
             self.browserbase_api_key = browserbase_api_key or os.getenv(
                 "BROWSERBASE_API_KEY"
@@ -69,6 +101,10 @@ class StagehandBase(ABC):
             self.model_name = model_name
             self.dom_settle_timeout_ms = dom_settle_timeout_ms
             self.debug_dom = debug_dom
+            self.self_heal = self_heal
+            self.wait_for_captcha_solves = wait_for_captcha_solves
+            self.act_timeout_ms = act_timeout_ms
+            self.system_prompt = system_prompt
 
         # Handle model-related settings directly
         self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")

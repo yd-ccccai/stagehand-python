@@ -56,6 +56,7 @@ class Stagehand(StagehandBase):
         self._browser = None
         self._context = None
         self._playwright_page = None
+        self.page: Optional[SyncStagehandPage] = None
         self.model_client_options = model_client_options
         self.streamed_response = True  # Default to True for streamed responses
 
@@ -115,7 +116,7 @@ class Stagehand(StagehandBase):
         # Wrap with SyncStagehandPage
         self._log("Wrapping Playwright page in SyncStagehandPage", level=3)
         self.page = SyncStagehandPage(self._playwright_page, self)
-
+        
         self._initialized = True
 
     def close(self):

@@ -49,6 +49,10 @@ class Stagehand(StagehandBase):
         timeout_settings: Optional[httpx.Timeout] = None,
         model_client_options: Optional[dict[str, Any]] = None,
         stream_response: Optional[bool] = None,
+        self_heal: Optional[bool] = None,
+        wait_for_captcha_solves: Optional[bool] = None,
+        act_timeout_ms: Optional[int] = None,
+        system_prompt: Optional[str] = None,
     ):
         """
         Initialize the Stagehand client.
@@ -69,6 +73,10 @@ class Stagehand(StagehandBase):
             timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
             model_client_options (Optional[dict[str, Any]]): Optional model client options.
             stream_response (Optional[bool]): Whether to stream responses from the server.
+            self_heal (Optional[bool]): Whether to enable self-healing functionality.
+            wait_for_captcha_solves (Optional[bool]): Whether to wait for CAPTCHA solves.
+            act_timeout_ms (Optional[int]): Timeout for act commands in milliseconds.
+            system_prompt (Optional[str]): System prompt for LLM interactions.
         """
         super().__init__(
             config=config,
@@ -85,6 +93,10 @@ class Stagehand(StagehandBase):
             timeout_settings=timeout_settings,
             stream_response=stream_response,
             model_client_options=model_client_options,
+            self_heal=self_heal,
+            wait_for_captcha_solves=wait_for_captcha_solves,
+            act_timeout_ms=act_timeout_ms,
+            system_prompt=system_prompt,
         )
 
         self.httpx_client = httpx_client
@@ -256,6 +268,19 @@ class Stagehand(StagehandBase):
             "verbose": self.verbose,
             "debugDom": self.debug_dom,
         }
+
+        # Add the new parameters if they have values
+        if hasattr(self, "self_heal") and self.self_heal is not None:
+            payload["selfHeal"] = self.self_heal
+            
+        if hasattr(self, "wait_for_captcha_solves") and self.wait_for_captcha_solves is not None:
+            payload["waitForCaptchaSolves"] = self.wait_for_captcha_solves
+            
+        if hasattr(self, "act_timeout_ms") and self.act_timeout_ms is not None:
+            payload["actTimeoutMs"] = self.act_timeout_ms
+            
+        if hasattr(self, "system_prompt") and self.system_prompt:
+            payload["systemPrompt"] = self.system_prompt
 
         if hasattr(self, "model_client_options") and self.model_client_options:
             payload["modelClientOptions"] = self.model_client_options
