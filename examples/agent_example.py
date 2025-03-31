@@ -66,9 +66,6 @@ async def main():
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
-
-    # Demonstrate the agent functionality
-    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
     
     # Configure the agent
     agent_config = AgentConfig(
@@ -89,7 +86,7 @@ async def main():
     await stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
-    # Execute the agent task using the new agent interface
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
     agent_result = await stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")

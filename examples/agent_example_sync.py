@@ -65,9 +65,6 @@ def main():
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
-
-    # Demonstrate the agent functionality
-    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
     
     # Configure the agent
     agent_config = AgentConfig(
@@ -89,6 +86,7 @@ def main():
     stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
     # Execute the agent task using the new agent interface
     agent_result = stagehand.agent.execute(agent_config, execute_options)
     
