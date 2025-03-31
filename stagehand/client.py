@@ -9,6 +9,7 @@ import httpx
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
+from .agent import Agent
 from .base import StagehandBase
 from .config import StagehandConfig
 from .page import StagehandPage
@@ -113,6 +114,7 @@ class Stagehand(StagehandBase):
         self._context = None
         self._playwright_page = None
         self.page: Optional[StagehandPage] = None
+        self.agent = None
 
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
@@ -206,6 +208,10 @@ class Stagehand(StagehandBase):
         # Wrap with StagehandPage
         self._log("Wrapping Playwright page in StagehandPage", level=3)
         self.page = StagehandPage(self._playwright_page, self)
+        
+        # Initialize agent
+        self._log("Initializing Agent", level=3)
+        self.agent = Agent(self)
 
         self._initialized = True
 
@@ -364,6 +370,11 @@ class Stagehand(StagehandBase):
                         raise RuntimeError(
                             f"Request failed: {data.get('error', 'Unknown error')}"
                         )
+                
+                # log the whole request
+                self._log(f"Request: {modified_payload}", level=3)
+                self._log(f"Headers: {headers}", level=3)
+                self._log(f"URL: {self.server_url}/sessions/{self.session_id}/{method}", level=3)
 
                 # Handle streaming response
                 async with client.stream(
@@ -442,6 +453,11 @@ class Stagehand(StagehandBase):
         """
         Internal logging with optional verbosity control.
         Maps internal level to Python logging levels.
+        
+        Verbosity levels:
+        - 1 (default): Important info (maps to INFO)
+        - 2: Warnings and additional information (maps to WARNING)
+        - 3: Detailed debug information (maps to DEBUG)
         """
         if self.verbose >= level:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -451,5 +467,5 @@ class Stagehand(StagehandBase):
                 logger.info(formatted_msg)
             elif level == 2:
                 logger.warning(formatted_msg)
-            else:
+            elif level == 3:
                 logger.debug(formatted_msg)

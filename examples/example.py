@@ -1,14 +1,13 @@
 import asyncio
 import logging
 import os
-
-from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
+import json
+from dotenv import load_dotenv
 
-from stagehand.client import Stagehand
-from stagehand.config import StagehandConfig
+from stagehand import Stagehand, StagehandConfig, configure_logging
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
@@ -27,13 +26,28 @@ console = Console(theme=custom_theme)
 
 load_dotenv()
 
-# Configure logging with Rich handler
-logging.basicConfig(
-    level=logging.WARNING,  # Feel free to change this to INFO or DEBUG to see more logs
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+# Configure logging with the utility function
+configure_logging(
+    level=logging.DEBUG,  # Set to DEBUG to see all logs, including verbosity level 3
 )
 
+# Set higher log levels for noisy libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+# Set stagehand.utils to WARNING level
+logging.getLogger("stagehand.utils").setLevel(logging.WARNING)
+
+console.print(
+    Panel.fit(
+        "[yellow]Logging Levels:[/]\n"
+        "[white]- Set [bold]verbose=1[/] for minimal logs (INFO)[/]\n"
+        "[white]- Set [bold]verbose=2[/] for medium logs (WARNING)[/]\n"
+        "[white]- Set [bold]verbose=3[/] for detailed logs (DEBUG)[/]",
+        title="Verbosity Options",
+        border_style="blue",
+    )
+)
 
 async def main():
     # Build a unified configuration object for Stagehand
@@ -52,8 +66,10 @@ async def main():
     )
 
     # Create a Stagehand client using the configuration object.
+    # Change verbose level (1-3) to control log verbosity:
+    # 1 = minimal logs, 2 = medium logs, 3 = detailed logs
     stagehand = Stagehand(
-        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2
+        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=3
     )
 
     # Initialize - this creates a new session automatically.

@@ -24,6 +24,7 @@ class StagehandConfig(BaseModel):
         wait_for_captcha_solves (Optional[bool]): Whether to wait for CAPTCHA to be solved.
         act_timeout_ms (Optional[int]): Timeout for act commands (in milliseconds).
         system_prompt (Optional[str]): System prompt to use for LLM interactions.
+        verbose (Optional[int]): Verbosity level for logs (1=minimal, 2=medium, 3=detailed).
     """
 
     env: str = "BROWSERBASE"
@@ -73,6 +74,10 @@ class StagehandConfig(BaseModel):
         None,
         alias="systemPrompt",
         description="System prompt to use for LLM interactions"
+    )
+    verbose: Optional[int] = Field(
+        1,
+        description="Verbosity level for logs: 1=minimal (INFO), 2=medium (WARNING), 3=detailed (DEBUG)"
     )
 
     model_config = ConfigDict(populate_by_name=True)
