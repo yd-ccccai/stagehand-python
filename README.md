@@ -40,16 +40,228 @@
 
 ---
 
-Stagehand is the easiest way to build browser automations with AI-powered interactions. It extends the Playwright API with three powerful AI primitives:
+Stagehand is the easiest way to build browser automations with AI-powered interactions.
 
 - **act** — Instruct the AI to perform actions (e.g. click a button or scroll).
+```python
+await stagehand.page.act("click on the 'Quickstart' button")
+```
 - **extract** — Extract and validate data from a page using a JSON schema (generated either manually or via a Pydantic model).
+```python
+await stagehand.page.extract("the summary of the first paragraph")
+```
 - **observe** — Get natural language interpretations to, for example, identify selectors or elements from the DOM.
+```python
+await stagehand.page.observe("find the search bar")
+```
+- **agent** — Execute autonomous multi-step tasks with provider-specific agents (OpenAI, Anthropic, etc.).
+```python
+await stagehand.agent.execute("book a reservation for 2 people for a trip to the Maldives")
+```
+
+## Installation
+
+Install the Python package via pip:
+
+```bash
+pip install stagehand-py
+```
+## Requirements
+
+- Python 3.7+
+- httpx (for async client)
+- requests (for sync client)
+- asyncio (for async client)
+- pydantic
+- python-dotenv (optional, for .env support)
+- playwright
+- rich (for `examples/` terminal support)
+
+You can simply run:
+
+```bash
+pip install -r requirements.txt
+```
+
+
+## Environment Variables
+
+Before running your script, set the following environment variables:
+
+```bash
+export BROWSERBASE_API_KEY="your-api-key"
+export BROWSERBASE_PROJECT_ID="your-project-id"
+export MODEL_API_KEY="your-openai-api-key"  # or your preferred model's API key
+export STAGEHAND_SERVER_URL="url-of-stagehand-server"
+```
+
+You can also make a copy of `.env.example` and add these to your `.env` file. 
+
+## Quickstart
+
+Stagehand supports both synchronous and asynchronous usage. Here are examples for both approaches:
+
+### Sync Client
+
+```python
+import os
+from stagehand.sync import Stagehand, StagehandConfig
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def main():
+    # Configure Stagehand
+    config = StagehandConfig(
+        env="BROWSERBASE",
+        api_key=os.getenv("BROWSERBASE_API_KEY"),
+        project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
+        model_name="gpt-4o",
+        model_client_options={"apiKey": os.getenv("MODEL_API_KEY")}
+    )
+
+    # Initialize Stagehand
+    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"))
+    stagehand.init()
+    print(f"Session created: {stagehand.session_id}")
+
+    # Navigate to a page
+    stagehand.page.goto("https://google.com/")
+
+    # Use Stagehand AI primitives
+    stagehand.page.act("search for openai")
+
+    # Combine with Playwright
+    stagehand.page.keyboard.press("Enter")
+
+    # Observe elements on the page
+    observed = stagehand.page.observe("find the news button")
+    if observed:
+        stagehand.page.act(observed[0])  # Act on the first observed element
+
+    # Extract data from the page
+    data = stagehand.page.extract("extract the first result from the search")
+    print(f"Extracted data: {data}")
+
+    # Close the session
+    stagehand.close()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Async Client
+
+```python
+import os
+import asyncio
+from stagehand import Stagehand, StagehandConfig
+from dotenv import load_dotenv
+
+load_dotenv()
+
+async def main():
+    # Configure Stagehand
+    config = StagehandConfig(
+        env="BROWSERBASE",
+        api_key=os.getenv("BROWSERBASE_API_KEY"),
+        project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
+        model_name="gpt-4o",
+        model_client_options={"apiKey": os.getenv("MODEL_API_KEY")}
+    )
+
+    # Initialize Stagehand
+    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"))
+    await stagehand.init()
+    print(f"Session created: {stagehand.session_id}")
+    
+    # Get page reference
+    page = stagehand.page
+
+    # Navigate to a page
+    await page.goto("https://google.com/")
+
+    # Use Stagehand AI primitives
+    await page.act("search for openai")
+
+    # Combine with Playwright
+    await page.keyboard.press("Enter")
+
+    # Observe elements on the page
+    observed = await page.observe("find the news button")
+    if observed:
+        await page.act(observed[0])  # Act on the first observed element
+
+    # Extract data from the page
+    data = await page.extract("extract the first result from the search")
+    print(f"Extracted data: {data}")
+
+    # Close the session
+    await stagehand.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Agent Example
+
+```python
+import os
+from stagehand.sync import Stagehand, StagehandConfig
+from stagehand.schemas import AgentConfig, AgentExecuteOptions, AgentProvider
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def main():
+    # Configure Stagehand
+    config = StagehandConfig(
+        env="BROWSERBASE",
+        api_key=os.getenv("BROWSERBASE_API_KEY"),
+        project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
+        model_name="gpt-4o",
+        model_client_options={"apiKey": os.getenv("MODEL_API_KEY")}
+    )
+
+    # Initialize Stagehand
+    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"))
+    stagehand.init()
+    print(f"Session created: {stagehand.session_id}")
+    
+    # Navigate to Google
+    stagehand.page.goto("https://google.com/")
+    
+    # Configure the agent
+    agent_config = AgentConfig(
+        provider=AgentProvider.OPENAI,
+        model="computer-use-preview",
+        instructions="You are a helpful web navigation assistant. You are currently on google.com."
+        options={"apiKey": os.getenv("MODEL_API_KEY")}
+    )
+    
+    # Define execution options
+    execute_options = AgentExecuteOptions(
+        instruction="Search for 'latest AI news' and extract the titles of the first 3 results",
+        max_steps=10,
+        auto_screenshot=True
+    )
+    
+    # Execute the agent task
+    agent_result = stagehand.agent.execute(agent_config, execute_options)
+    
+    print(f"Agent execution result: {agent_result}")
+    
+    # Close the session
+    stagehand.close()
+
+if __name__ == "__main__":
+    main()
+```
+
 ## Pydantic Schemas
 
-Stagehand uses Pydantic models to define the options for AI commands:
-
 - **ActOptions**  
+
   The `ActOptions` model takes an `action` field that tells the AI what to do on the page, plus optional fields such as `useVision` and `variables`:
   ```python
   from stagehand.schemas import ActOptions
@@ -59,6 +271,7 @@ Stagehand uses Pydantic models to define the options for AI commands:
   ```
 
 - **ObserveOptions**  
+
   The `ObserveOptions` model lets you find elements on the page using natural language. The `onlyVisible` option helps limit the results:
   ```python
   from stagehand.schemas import ObserveOptions
@@ -68,6 +281,7 @@ Stagehand uses Pydantic models to define the options for AI commands:
   ```
 
 - **ExtractOptions**  
+
   The `ExtractOptions` model extracts structured data from the page. Pass your instructions and a schema defining your expected data format. **Note:** If you are using a Pydantic model for the schema, call its `.model_json_schema()` method to ensure JSON serializability.
   ```python
   from stagehand.schemas import ExtractOptions
@@ -95,140 +309,6 @@ While there's no limit to what you could instruct Stagehand to do, our primitive
 > `Stagehand` is currently available as an early release, and we're actively seeking feedback from the community. Please join our [Slack community](https://join.slack.com/t/stagehand-dev/shared_invite/zt-2tdncfgkk-fF8y5U0uJzR2y2_M9c9OJA) to stay updated on the latest developments and provide feedback.
 
 
-## Installation
-
-Install the Python package via pip:
-
-```bash
-pip install stagehand-py
-```
-
-## Environment Variables
-
-Before running your script, set the following environment variables:
-
-```bash
-export BROWSERBASE_API_KEY="your-api-key"
-export BROWSERBASE_PROJECT_ID="your-project-id"
-export OPENAI_API_KEY="your-openai-api-key"  # or your preferred model's API key
-export STAGEHAND_SERVER_URL="url-of-stagehand-server"
-```
-
-## Quickstart
-
-Stagehand supports both synchronous and asynchronous usage. Here are examples for both approaches:
-
-### Synchronous Usage
-
-```python
-import os
-from stagehand.sync.client import Stagehand
-from stagehand.schemas import ActOptions, ExtractOptions
-from pydantic import BaseModel
-from dotenv import load_dotenv
-
-load_dotenv()
-
-class DescriptionSchema(BaseModel):
-    description: str
-
-def main():
-    # Create a Stagehand client - it will automatically create a new session if needed
-    stagehand = Stagehand(
-        model_name="gpt-4",  # Optional: defaults are available from the server
-    )
-
-    # Initialize Stagehand and create a new session
-    stagehand.init()
-    print(f"Created new session: {stagehand.session_id}")
-
-    # Navigate to a webpage using local Playwright controls
-    stagehand.page.goto("https://www.example.com")
-    print("Navigation complete.")
-
-    # Perform an action using the AI (e.g. simulate a button click)
-    stagehand.page.act("click on the 'Quickstart' button")
-
-    # Extract data from the page with schema validation
-    data = stagehand.page.extract(
-        ExtractOptions(
-            instruction="extract the description of the page",
-            schemaDefinition=DescriptionSchema.model_json_schema()
-        )
-    )
-    description = data.get("description") if isinstance(data, dict) else data.description
-    print("Extracted description:", description)
-
-    stagehand.close()
-
-if __name__ == "__main__":
-    main()
-```
-
-### Asynchronous Usage
-
-```python
-import asyncio
-import os
-from stagehand.client import Stagehand
-from stagehand.schemas import ActOptions, ExtractOptions
-from pydantic import BaseModel
-from dotenv import load_dotenv
-
-load_dotenv()
-
-class DescriptionSchema(BaseModel):
-    description: str
-
-async def main():
-    # Create a Stagehand client - it will automatically create a new session if needed
-    stagehand = Stagehand(
-        model_name="gpt-4o",  # Optional: defaults are available from the server
-    )
-
-    # Initialize Stagehand and create a new session
-    await stagehand.init()
-    print(f"Created new session: {stagehand.session_id}")
-
-    # Navigate to a webpage using local Playwright controls
-    await stagehand.page.goto("https://www.example.com")
-    print("Navigation complete.")
-
-    # Perform an action using the AI (e.g. simulate a button click)
-    await stagehand.page.act("click on the 'Quickstart' button")
-
-    # Extract data from the page with schema validation
-    data = await stagehand.page.extract(
-        ExtractOptions(
-            instruction="extract the description of the page",
-            schemaDefinition=DescriptionSchema.model_json_schema()
-        )
-    )
-    description = data.get("description") if isinstance(data, dict) else data.description
-    print("Extracted description:", description)
-
-    await stagehand.close()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-## Evals
-
-To test all evaluations, run the following command in your terminal:
-
-`python evals/run_all_evals.py`
-
-This script will dynamically discover and execute every evaluation module within the `evals` directory and print the results for each.
-
-## More Examples
-
-For further examples, check out the scripts in the `examples/` directory:
-
-1. **examples/example.py**: Demonstrates combined server-side/page navigation with AI-based actions.
-2. **examples/extract-example.py**: Shows how to use the extract functionality with a JSON schema or a Pydantic model.
-3. **examples/observe-example.py**: Demonstrates the observe functionality to get natural-language readings of the page.
-
 ## Configuration
 
 Stagehand can be configured via environment variables or through a `StagehandConfig` object. Available configuration options include:
@@ -242,7 +322,7 @@ Stagehand can be configured via environment variables or through a `StagehandCon
   - Level 1: Basic info logs (minimal, maps to INFO level)
   - Level 2: Medium logs including warnings (maps to WARNING level)
   - Level 3: Detailed debug information (maps to DEBUG level)
-- `model_name`: Optional model name for the AI.
+- `model_name`: Optional model name for the AI (e.g. "gpt-4o").
 - `dom_settle_timeout_ms`: Additional time (in ms) to have the DOM settle.
 - `debug_dom`: Enable debug mode for DOM operations.
 - `stream_response`: Whether to stream responses from the server (default: True).
@@ -265,38 +345,6 @@ config = StagehandConfig(
     model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
     verbose=3  # Set verbosity level: 1=minimal, 2=medium, 3=detailed logs
 )
-```
-
-## Features
-
-- **AI-powered Browser Control**: Execute natural language instructions over a running browser.
-- **Validated Data Extraction**: Use JSON schemas (or Pydantic models) to extract and validate information from pages.
-- **Async/Sync Support**: Choose between asynchronous and synchronous APIs based on your needs.
-- **Context Manager Support**: Automatic resource cleanup with async and sync context managers.
-- **Extensible**: Seamlessly extend Playwright functionality with AI enrichments.
-- **Streaming Support**: Sreaming responses for better performance with long-running operations. Default True.
-
-## Requirements
-
-- Python 3.7+
-- httpx (for async client)
-- requests (for sync client)
-- asyncio (for async client)
-- pydantic
-- python-dotenv (optional, for .env support)
-- playwright
-
-## Contributing
-
-### Running Tests
-
-The project uses pytest for testing. To run the tests:
-
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-chmod +x run_tests.sh && ./run_tests.sh
 ```
 
 ## License
