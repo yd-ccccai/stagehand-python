@@ -79,8 +79,8 @@ def main():
     
     # Define the task for the agent
     execute_options = AgentExecuteOptions(
-        instruction="Search for openai news on google and extract the name of the first 3 results",
-        max_steps=10,
+        instruction="Play a game of 2048",
+        max_steps=20,
         auto_screenshot=True,
     )
 
