@@ -6,7 +6,8 @@ from rich.theme import Theme
 import json
 from dotenv import load_dotenv
 
-from stagehand.sync import Stagehand, StagehandConfig
+from stagehand.sync import Stagehand
+from stagehand import StagehandConfig
 from stagehand import configure_logging
 
 # Create a custom theme for consistent styling
