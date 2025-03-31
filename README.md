@@ -238,6 +238,7 @@ Stagehand can be configured via environment variables or through a `StagehandCon
 - `browserbase_project_id`: Your Browserbase project ID (`BROWSERBASE_PROJECT_ID`).
 - `model_api_key`: Your model API key (e.g. OpenAI, Anthropic, etc.) (`MODEL_API_KEY`).
 - `verbose`: Verbosity level (default: 1).
+  - Level 0: Error logs
   - Level 1: Basic info logs (minimal, maps to INFO level)
   - Level 2: Medium logs including warnings (maps to WARNING level)
   - Level 3: Detailed debug information (maps to DEBUG level)
