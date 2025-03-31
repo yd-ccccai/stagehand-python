@@ -29,7 +29,7 @@ load_dotenv()
 
 # Configure logging with the utility function
 configure_logging(
-    level=logging.WARNING,  # Feel free to change this to INFO or DEBUG to see more logs
+    level=logging.DEBUG,  # Feel free to change this to INFO or DEBUG to see more logs
 )
 
 # Set higher log levels for noisy libraries
@@ -72,8 +72,9 @@ async def main():
     # Configure the agent
     agent_config = AgentConfig(
         provider=AgentProvider.OPENAI,
-        model="computer-use-preview",  # Updated to computer-use-preview model
+        model="computer-use-preview",
         instructions="You are a helpful web navigation assistant that helps users find information. You are currently on the following page: google.com. Do not ask follow up questions, the user will trust your judgement.",
+        options={"apiKey": os.getenv("MODEL_API_KEY")}
     )
     
     # Define the task for the agent
