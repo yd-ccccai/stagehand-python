@@ -65,9 +65,6 @@ def main():
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
-
-    # Demonstrate the agent functionality
-    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
     
     # Configure the agent
     agent_config = AgentConfig(
@@ -79,8 +76,8 @@ def main():
     
     # Define the task for the agent
     execute_options = AgentExecuteOptions(
-        instruction="Search for openai news on google and extract the name of the first 3 results",
-        max_steps=10,
+        instruction="Play a game of 2048",
+        max_steps=20,
         auto_screenshot=True,
     )
 
@@ -89,6 +86,7 @@ def main():
     stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
     # Execute the agent task using the new agent interface
     agent_result = stagehand.agent.execute(agent_config, execute_options)
     

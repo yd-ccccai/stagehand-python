@@ -273,6 +273,15 @@ class Stagehand(StagehandBase):
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
             "verbose": self.verbose,
             "debugDom": self.debug_dom,
+            "browserbaseSessionCreateParams": {
+              "browserSettings": {
+                  "blockAds": True,
+                  "viewport": {
+                      "width": 1024,
+                      "height": 768,
+                  },
+              },
+            },
         }
 
         # Add the new parameters if they have values

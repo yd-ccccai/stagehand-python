@@ -29,7 +29,7 @@ load_dotenv()
 
 # Configure logging with the utility function
 configure_logging(
-    level=logging.DEBUG,  # Feel free to change this to INFO or DEBUG to see more logs
+    level=logging.WARNING,  # Feel free to change this to INFO or DEBUG to see more logs
 )
 
 # Set higher log levels for noisy libraries
@@ -51,6 +51,7 @@ async def main():
         act_timeout_ms=60000,  # 60 seconds timeout for actions
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
+        verbose=2,
     )
 
     # Create a Stagehand client using the configuration object.
@@ -65,9 +66,6 @@ async def main():
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
-
-    # Demonstrate the agent functionality
-    console.print("\n▶️ [highlight] Using Agent to perform a task[/]")
     
     # Configure the agent
     agent_config = AgentConfig(
@@ -79,8 +77,8 @@ async def main():
     
     # Define the task for the agent
     execute_options = AgentExecuteOptions(
-        instruction="Search for openai news on google and extract the name of the first 3 results",
-        max_steps=10,
+        instruction="Play a game of 2048",
+        max_steps=20,
         auto_screenshot=True,
     )
 
@@ -88,7 +86,7 @@ async def main():
     await stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
-    # Execute the agent task using the new agent interface
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
     agent_result = await stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")
