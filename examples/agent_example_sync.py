@@ -6,14 +6,15 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand.sync import Stagehand
-from stagehand import StagehandConfig, Agent, AgentConfig, configure_logging
+from stagehand.sync import Stagehand, SyncAgent
+from stagehand import StagehandConfig, AgentConfig
+from stagehand.utils import configure_logging, StagehandLogger
 from stagehand.schemas import AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
     {
-        "info": "cyan",
+        "info": "bold white",
         "success": "green",
         "warning": "yellow",
         "error": "red bold",
@@ -29,13 +30,22 @@ load_dotenv()
 
 # Configure logging with the utility function
 configure_logging(
-    level=logging.WARNING,  # Feel free to change this to INFO or DEBUG to see more logs
+    level=logging.INFO,  # Set to INFO for regular logs, DEBUG for detailed
+    use_rich=True,       # Use Rich for colorized output
+    quiet_dependencies=True,  # Reduce noise from dependencies
 )
 
-# Set higher log levels for noisy libraries
-logging.getLogger("httpx").setLevel(logging.ERROR)
-logging.getLogger("httpcore").setLevel(logging.ERROR)
-logging.getLogger("asyncio").setLevel(logging.WARNING)
+console.print(
+    Panel.fit(
+        "[yellow]Logging Levels:[/]\n"
+        "[white]- Set [bold]verbose=0[/] for errors (ERROR)[/]\n"
+        "[white]- Set [bold]verbose=1[/] for minimal logs (INFO)[/]\n"
+        "[white]- Set [bold]verbose=2[/] for medium logs (WARNING)[/]\n"
+        "[white]- Set [bold]verbose=3[/] for detailed logs (DEBUG)[/]",
+        title="Verbosity Options",
+        border_style="blue",
+    )
+)
 
 def main():
     # Build a unified configuration object for Stagehand
@@ -48,14 +58,17 @@ def main():
         model_name="gpt-4o",
         self_heal=True,
         wait_for_captcha_solves=True,
-        act_timeout_ms=60000,  # 60 seconds timeout for actions
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
+        # Set verbosity level here. This affects both the server and client logs.
+        verbose=2,  # Change to 1 for minimal, 2 for medium, 3 for detailed
     )
 
     # Create a Stagehand client using the configuration object.
     stagehand = Stagehand(
-        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2
+        config=config, 
+        server_url=os.getenv("STAGEHAND_SERVER_URL"),
+        use_rich_logging=True  # Enable rich formatting for logs
     )
 
     # Initialize - this creates a new session automatically.
@@ -69,7 +82,7 @@ def main():
     # Configure the agent
     agent_config = AgentConfig(
         provider=AgentProvider.OPENAI,
-        model="computer-use-preview",  # Updated to computer-use-preview model
+        model="computer-use-preview",
         instructions="You are a helpful web navigation assistant that helps users find information. You are currently on the following page: google.com. Do not ask follow up questions, the user will trust your judgement.",
         options={"apiKey": os.getenv("MODEL_API_KEY")}
     )
@@ -81,13 +94,11 @@ def main():
         auto_screenshot=True,
     )
 
-    # Navigate to google
     console.print("\n▶️ [highlight] Navigating[/] to Google")
     stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
     console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
-    # Execute the agent task using the new agent interface
     agent_result = stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")

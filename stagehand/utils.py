@@ -16,12 +16,13 @@ stagehand_theme = Theme({
     "info": "cyan",
     "warning": "yellow",
     "error": "bold red",
-    "debug": "dim white",
+    "debug": "bold white",
     "category": "bold blue",
     "auxiliary": "white",
-    "timestamp": "white",
-    "success": "white",
+    "timestamp": "dim white",
+    "success": "bold white",
     "pending": "bold yellow",
+    "ellipsis": "bold white",
 })
 
 # Create console instance with theme
@@ -163,11 +164,129 @@ class StagehandLogger:
         json_str = json.dumps(data, indent=2)
         syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
         return syntax
+    
+    def _format_message_with_json(self, message: str) -> str:
+        """
+        Parse and format any JSON-like structures within a message string.
+        This helps with pretty-printing log messages that contain raw JSON or Python dict representations.
+        """
+        # Handle case where message is already a dictionary
+        if isinstance(message, dict):
+            # Format the dict as JSON
+            if self.use_rich:
+                json_str = json.dumps(message, indent=2)
+                return f"\n{json_str}"
+            else:
+                return json.dumps(message, indent=2)
+        
+        if not isinstance(message, str):
+            # If not a string and not a dict, convert to string
+            return str(message)
+            
+        import re
+        
+        # Function to replace dict-like patterns with formatted JSON
+        def replace_dict(match):
+            try:
+                # Handle Python dictionary format by safely evaluating it
+                # This converts string representation of Python dict to actual dict
+                import ast
+                dict_str = match.group(0)
+                dict_obj = ast.literal_eval(dict_str)
+                
+                # Format the dict as JSON
+                if self.use_rich:
+                    json_str = json.dumps(dict_obj, indent=2)
+                    return f"\n{json_str}"
+                else:
+                    return json.dumps(dict_obj, indent=2)
+            except (SyntaxError, ValueError):
+                # If parsing fails, return the original string
+                return match.group(0)
+        
+        # Pattern to match Python dictionary literals
+        pattern = r"(\{[^{}]*(\{[^{}]*\}[^{}]*)*\})"
+        
+        # Replace dictionary patterns with formatted JSON
+        return re.sub(pattern, replace_dict, message)
+    
+    def _format_fastify_log(self, message: str, auxiliary: Dict[str, Any] = None) -> tuple:
+        """
+        Special formatting for logs that come from the Fastify server.
+        These often contain Python representations of JSON objects.
+        
+        Returns:
+            tuple: (formatted_message, formatted_auxiliary)
+        """
+        # Handle case where message is already a dictionary
+        if isinstance(message, dict):
+            # Extract the actual message and other fields
+            extracted_message = message.get('message', '')
+            category = message.get('category', '')
+            
+            # Format any remaining data for display
+            formatted_json = json.dumps(message, indent=2)
+            
+            if self.use_rich:
+                syntax = Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
+                if category:
+                    extracted_message = f"[{category}] {extracted_message}"
+                    
+                # Handle ellipses in message separately
+                if "..." in extracted_message:
+                    extracted_message = extracted_message.replace("...", "[ellipsis]...[/ellipsis]")
+                    
+                return extracted_message, None
+            else:
+                if category and not extracted_message.startswith(f"[{category}]"):
+                    extracted_message = f"[{category}] {extracted_message}"
+                return extracted_message, None
+        
+        # Check if this appears to be a string representation of a JSON object
+        elif isinstance(message, str) and (message.startswith("{'") or message.startswith("{")):
+            try:
+                # Try to parse the message as a Python dict using ast.literal_eval
+                # This is safer than eval() for parsing Python literal structures
+                import ast
+                data = ast.literal_eval(message)
+                
+                # Extract the actual message and other fields
+                extracted_message = data.get('message', '')
+                category = data.get('category', '')
+                
+                # Format any remaining data for display
+                formatted_json = json.dumps(data, indent=2)
+                
+                if self.use_rich:
+                    syntax = Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
+                    if category:
+                        extracted_message = f"[{category}] {extracted_message}"
+                        
+                    # Handle ellipses in message separately
+                    if "..." in extracted_message:
+                        extracted_message = extracted_message.replace("...", "[ellipsis]...[/ellipsis]")
+                        
+                    return extracted_message, None
+                else:
+                    if category and not extracted_message.startswith(f"[{category}]"):
+                        extracted_message = f"[{category}] {extracted_message}"
+                    return extracted_message, None
+            except (SyntaxError, ValueError):
+                # If parsing fails, use the original message
+                pass
+        
+        # For regular string messages that contain ellipses
+        elif isinstance(message, str) and "..." in message:
+            formatted_message = message.replace("...", "[ellipsis]...[/ellipsis]")
+            return formatted_message, auxiliary
+                
+        # Default: return the original message and auxiliary
+        return message, auxiliary
         
     def _format_auxiliary_compact(self, auxiliary: Dict[str, Any]) -> str:
         """Format auxiliary data in a compact, readable way"""
         if not auxiliary:
-            return ""
+            return {}
             
         # Clean and format the auxiliary data
         formatted = {}
@@ -180,13 +299,18 @@ class StagehandLogger:
             # Handle nested values that come from the API
             if isinstance(value, dict) and "value" in value:
                 extracted = value.get("value")
+                type_info = value.get("type")
                 
                 # Skip empty values
                 if not extracted:
                     continue
-                    
+                
+                # For nested objects with 'value' and 'type', use a cleaner representation
+                if isinstance(extracted, (dict, list)) and type_info == "object":
+                    # For complex objects, keep the whole structure
+                    formatted[key] = extracted
                 # Handle different types of values
-                if key in ["sessionId", "url", "sessionUrl", "debugUrl"]:
+                elif key in ["sessionId", "url", "sessionUrl", "debugUrl"]:
                     # Keep these values as is
                     formatted[key] = extracted
                 elif isinstance(extracted, str) and len(extracted) > 40:
@@ -198,9 +322,6 @@ class StagehandLogger:
                 # Handle direct values
                 formatted[key] = value
                 
-        if not formatted:
-            return ""
-            
         return formatted
     
     def log(self, message: str, level: int = 1, category: str = None, 
@@ -221,27 +342,35 @@ class StagehandLogger:
         # Get level style
         level_style = self.level_style.get(level, "info")
         
+        # Check for Fastify server logs and format them specially
+        formatted_message, formatted_auxiliary = self._format_fastify_log(message, auxiliary)
+        
+        # Process the auxiliary data if it wasn't handled by the Fastify formatter
+        if formatted_auxiliary is None:
+            aux_data = None
+        else:
+            # For regular messages, apply JSON formatting
+            formatted_message = self._format_message_with_json(formatted_message)
+            aux_data = self._format_auxiliary_compact(formatted_auxiliary or auxiliary) if auxiliary else {}
+        
         # Format the log message
         if self.use_rich:
             # Format the timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Process auxiliary data for compact display
-            aux_data = self._format_auxiliary_compact(auxiliary) if auxiliary else {}
-            
             # Special handling for specific categories
             if category in ["action", "navigation"]:
                 # Success marker for completed actions
-                if "Navigated to" in message or "Clicked on" in message:
-                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [success]✓[/success] {message}")
+                if "Navigated to" in formatted_message or "Clicked on" in formatted_message:
+                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [success]✓[/success] {formatted_message}")
                 else:
                     # Pending action marker
-                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [pending]→[/pending] {message}")
+                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [pending]→[/pending] {formatted_message}")
                 return
                 
             # For captcha category, show a more compact format
             if category == "captcha":
-                self.console.print(f"[timestamp]{timestamp}[/timestamp] [info]⏳[/info] {message}")
+                self.console.print(f"[timestamp]{timestamp}[/timestamp] [info]⏳[/info] {formatted_message}")
                 return
                 
             # Create the line prefix
@@ -252,7 +381,11 @@ class StagehandLogger:
                 line_prefix += f" [category]{category}[/category]"
                 
             # Add the message
-            log_line = f"{line_prefix} - {message}"
+            log_line = f"{line_prefix} - {formatted_message}"
+            
+            # Handle ellipses in the log line
+            if "..." in log_line and "[ellipsis]" not in log_line:
+                log_line = log_line.replace("...", "[ellipsis]...[/ellipsis]")
             
             # Add auxiliary data if we have it and it's processed
             if aux_data:
@@ -269,7 +402,7 @@ class StagehandLogger:
                     # Add as inline content with soft styling  
                     if items:
                         log_line += f" [auxiliary]({', '.join(items)})[/auxiliary]"
-                else:
+                elif aux_data is not None:
                     # We'll print auxiliary data separately
                     self.console.print(log_line)
                     
@@ -298,7 +431,7 @@ class StagehandLogger:
         else:
             # Standard logging
             prefix = f"[{category}] " if category else ""
-            log_message = f"{prefix}{message}"
+            log_message = f"{prefix}{formatted_message}"
             
             # Add auxiliary data in a clean format if present
             if auxiliary:
@@ -342,7 +475,7 @@ class StagehandLogger:
         if self.external_logger:
             # Format log data similar to TS LogLine structure
             log_data = {
-                "message": message,
+                "message": formatted_message,
                 "level": level,
                 "timestamp": datetime.now().isoformat(),
             }
@@ -405,10 +538,30 @@ def sync_log_handler(log_data: dict[str, Any]) -> None:
     # Process auxiliary data if present
     if "auxiliary" in log_data:
         auxiliary = log_data.get("auxiliary", {})
+        
+        # Convert string representation to actual object if needed
+        if isinstance(auxiliary, str) and (auxiliary.startswith("{") or auxiliary.startswith("{'")): 
+            try:
+                import ast
+                auxiliary = ast.literal_eval(auxiliary)
+            except (SyntaxError, ValueError):
+                # If parsing fails, keep as string
+                pass
     
-    # Create a temporary logger to handle this specific message
+    # Create a temporary logger to handle
     temp_logger = StagehandLogger(verbose=3, use_rich=True, external_logger=None)
-    temp_logger.log(message, level=level, category=category, auxiliary=auxiliary)
+    
+    try:
+        # Use the logger to format and display the message
+        temp_logger.log(message, level=level, category=category, auxiliary=auxiliary)
+    except Exception as e:
+        # Fall back to basic logging if formatting fails
+        print(f"Error formatting log: {str(e)}")
+        print(f"Original message: {message}")
+        if category:
+            print(f"Category: {category}")
+        if auxiliary:
+            print(f"Auxiliary data: {auxiliary}")
 
 
 async def default_log_handler(log_data: dict[str, Any]) -> None:

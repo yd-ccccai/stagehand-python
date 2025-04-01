@@ -10,14 +10,14 @@ from dotenv import load_dotenv
 from stagehand import Stagehand, StagehandConfig
 from stagehand.utils import configure_logging
 
-# Configure logging to use cleaner format
+# Configure logging with cleaner format
 configure_logging(
     level=logging.INFO,
-    remove_logger_name=True,  # Don't show stagehand.client prefix
-    quiet_dependencies=True   # Suppress httpx and other noisy logs
+    remove_logger_name=True,  # Remove the redundant stagehand.client prefix
+    quiet_dependencies=True,   # Suppress httpx and other noisy logs
 )
 
-# Create a custom theme for console output
+# Create a custom theme for consistent styling
 custom_theme = Theme(
     {
         "info": "cyan",
@@ -32,52 +32,19 @@ custom_theme = Theme(
 # Create a Rich console instance with our theme
 console = Console(theme=custom_theme)
 
-# Load environment variables
 load_dotenv()
 
-# Print logging info panel
 console.print(
     Panel.fit(
         "[yellow]Logging Levels:[/]\n"
-        "[white]- Set [bold]verbose=0[/] for errors only (ERROR)[/]\n"
-        "[white]- Set [bold]verbose=1[/] for standard logs (INFO)[/]\n"
-        "[white]- Set [bold]verbose=2[/] for detailed logs (WARNING)[/]\n"
-        "[white]- Set [bold]verbose=3[/] for debug logs (DEBUG)[/]",
+        "[white]- Set [bold]verbose=0[/] for errors (ERROR)[/]\n"
+        "[white]- Set [bold]verbose=1[/] for minimal logs (INFO)[/]\n"
+        "[white]- Set [bold]verbose=2[/] for medium logs (WARNING)[/]\n"
+        "[white]- Set [bold]verbose=3[/] for detailed logs (DEBUG)[/]",
         title="Verbosity Options",
         border_style="blue",
     )
 )
-
-def format_extraction(data):
-    """Format extraction data for cleaner display"""
-    if not data:
-        return "No data extracted"
-    
-    # Try to get the model_dump_json if it's a Pydantic model
-    if hasattr(data, "model_dump_json"):
-        try:
-            data_dict = json.loads(data.model_dump_json())
-        except:
-            data_dict = data
-    else:
-        data_dict = data
-    
-    # Check for extraction field
-    if isinstance(data_dict, dict) and "extraction" in data_dict:
-        extraction = data_dict["extraction"]
-        
-        # Handle dict extractions
-        if isinstance(extraction, dict):
-            return json.dumps(extraction, indent=2)
-        # Handle string extractions (make them stand out)
-        elif isinstance(extraction, str):
-            if "\n" in extraction:
-                return f"Extracted text:\n{extraction}"
-            else:
-                return f"Extracted: {extraction}"
-    
-    # Fall back to pretty-printed JSON
-    return json.dumps(data_dict, indent=2)
 
 async def main():
     # Build a unified configuration object for Stagehand
@@ -92,15 +59,13 @@ async def main():
         wait_for_captcha_solves=True,
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
-        # Use verbose=1 for basic logs, 2 for more detailed, 3 for debug
-        verbose=1,
+        # Use verbose=2 for medium-detail logs (1=minimal, 3=debug)
+        verbose=2,
     )
 
-    # Create a Stagehand client using the configuration object.
-    # Change verbose level to control log verbosity:
-    # 0 = only errors, 1 = basic logs, 2 = medium logs, 3 = detailed logs
     stagehand = Stagehand(
-        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL")
+        config=config, 
+        server_url=os.getenv("STAGEHAND_SERVER_URL"),
     )
 
     # Initialize - this creates a new session automatically.
@@ -148,7 +113,7 @@ async def main():
     console.print("\n▶️ [highlight] Extracting[/] first search result")
     data = await page.extract("extract the first result from the search")
     console.print("📊 [info]Extracted data:[/]")
-    console.print(format_extraction(data))
+    console.print_json(f"{data.model_dump_json()}")
 
     # Close the session
     console.print("\n⏹️ [warning]Closing session...[/]")

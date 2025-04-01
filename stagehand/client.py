@@ -442,8 +442,19 @@ class Stagehand(StagehandBase):
             else:
                 internal_level = min(level_str, 3)  # Ensure level is between 0-3
             
-            # Log using the structured logger (no await needed since StagehandLogger handles async loggers properly now)
-            self.logger.log(message, level=internal_level, category=category, auxiliary=auxiliary)
+            # Handle the case where message itself might be a JSON-like object
+            if isinstance(message, dict):
+                # If message is a dict, just pass it directly to the logger
+                formatted_message = message
+            elif isinstance(message, str) and (message.startswith("{") and ":" in message):
+                # If message looks like JSON but isn't a dict yet, it will be handled by _format_fastify_log
+                formatted_message = message
+            else:
+                # Regular message
+                formatted_message = message
+            
+            # Log using the structured logger
+            self.logger.log(formatted_message, level=internal_level, category=category, auxiliary=auxiliary)
                 
         except Exception as e:
             self.logger.error(f"Error processing log message: {str(e)}")
