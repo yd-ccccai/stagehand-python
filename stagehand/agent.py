@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Dict
 
 from .schemas import (
     AgentConfig,
@@ -6,7 +6,6 @@ from .schemas import (
     AgentExecuteResult,
     AgentProvider,
 )
-
 
 # Model to provider mapping
 MODEL_TO_PROVIDER_MAP: Dict[str, AgentProvider] = {
@@ -36,34 +35,42 @@ class Agent:
     ) -> AgentExecuteResult:
         """
         Execute a task using an autonomous agent via the Stagehand server.
-        
+
         Args:
             agent_config (AgentConfig): Configuration for the agent, including provider and model.
             execute_options (AgentExecuteOptions): Options for execution, including the instruction.
-            
+
         Returns:
             AgentExecuteResult: The result of the agent execution.
         """
         # If provider is not set but model is, infer provider from model
-        if not agent_config.provider and agent_config.model and agent_config.model in MODEL_TO_PROVIDER_MAP:
+        if (
+            not agent_config.provider
+            and agent_config.model
+            and agent_config.model in MODEL_TO_PROVIDER_MAP
+        ):
             agent_config.provider = MODEL_TO_PROVIDER_MAP[agent_config.model]
-        
+
         # Ensure provider is correctly set as an enum if provided as a string
         if agent_config.provider and isinstance(agent_config.provider, str):
             try:
                 agent_config.provider = AgentProvider(agent_config.provider.lower())
             except ValueError:
-                raise ValueError(f"Invalid provider: {agent_config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}")
-        
+                raise ValueError(
+                    f"Invalid provider: {agent_config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}"
+                )
+
         payload = {
             "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),
-            "executeOptions": execute_options.model_dump(exclude_none=True, by_alias=True),
+            "executeOptions": execute_options.model_dump(
+                exclude_none=True, by_alias=True
+            ),
         }
-        
+
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("agentExecute", payload)
-        
+
         if isinstance(result, dict):
             return AgentExecuteResult(**result)
-        return result 
+        return result

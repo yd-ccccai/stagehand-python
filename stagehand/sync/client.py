@@ -1,6 +1,5 @@
 import json
 import logging
-import time
 from typing import Any, Callable, Optional
 
 import requests
@@ -8,7 +7,7 @@ from playwright.sync_api import sync_playwright
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
-from ..utils import convert_dict_keys_to_camel_case, sync_log_handler, StagehandLogger
+from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
 from .agent import SyncAgent
 from .page import SyncStagehandPage
 
@@ -58,10 +57,12 @@ class Stagehand(StagehandBase):
             wait_for_captcha_solves=wait_for_captcha_solves,
             system_prompt=system_prompt,
         )
-        
+
         # Initialize the centralized logger with the specified verbosity
-        self.logger = StagehandLogger(verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging)
-        
+        self.logger = StagehandLogger(
+            verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
+        )
+
         self._client: Optional[requests.Session] = None
         self._playwright = None
         self._browser = None
@@ -124,11 +125,11 @@ class Stagehand(StagehandBase):
         # Wrap with SyncStagehandPage
         self.logger.debug("Wrapping Playwright page in SyncStagehandPage")
         self.page = SyncStagehandPage(self._playwright_page, self)
-        
+
         # Initialize agent
         self.logger.debug("Initializing SyncAgent")
         self.agent = SyncAgent(self)
-        
+
         self._initialized = True
 
     def close(self):
@@ -182,23 +183,26 @@ class Stagehand(StagehandBase):
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
             "verbose": self.verbose,
             "browserbaseSessionCreateParams": {
-              "browserSettings": {
-                  "blockAds": True,
-                  "viewport": {
-                      "width": 1024,
-                      "height": 768,
-                  },
-              },
+                "browserSettings": {
+                    "blockAds": True,
+                    "viewport": {
+                        "width": 1024,
+                        "height": 768,
+                    },
+                },
             },
         }
 
         # Add the new parameters if they have values
         if hasattr(self, "self_heal") and self.self_heal is not None:
             payload["selfHeal"] = self.self_heal
-            
-        if hasattr(self, "wait_for_captcha_solves") and self.wait_for_captcha_solves is not None:
+
+        if (
+            hasattr(self, "wait_for_captcha_solves")
+            and self.wait_for_captcha_solves is not None
+        ):
             payload["waitForCaptchaSolves"] = self.wait_for_captcha_solves
-            
+
         if hasattr(self, "system_prompt") and self.system_prompt:
             payload["systemPrompt"] = self.system_prompt
 
@@ -235,48 +239,57 @@ class Stagehand(StagehandBase):
             if self.on_log:
                 self.on_log(log_data)
                 return
-                
+
             # Extract message, category, and level info
             message = log_data.get("message", "")
             category = log_data.get("category", "")
             level_str = log_data.get("level", "info")
             auxiliary = log_data.get("auxiliary", {})
-            
+
             # Map level strings to internal levels
             level_map = {
                 "debug": 3,
-                "info": 1, 
+                "info": 1,
                 "warning": 2,
                 "error": 0,
             }
-            
+
             # Convert string level to int if needed
             if isinstance(level_str, str):
                 internal_level = level_map.get(level_str.lower(), 1)
             else:
                 internal_level = min(level_str, 3)  # Ensure level is between 0-3
-            
+
             # Handle the case where message itself might be a JSON-like object
             if isinstance(message, dict):
                 # If message is a dict, just pass it directly to the logger
                 formatted_message = message
-            elif isinstance(message, str) and (message.startswith("{") and ":" in message):
+            elif isinstance(message, str) and (
+                message.startswith("{") and ":" in message
+            ):
                 # If message looks like JSON but isn't a dict yet, it will be handled by _format_fastify_log
                 formatted_message = message
             else:
                 # Regular message
                 formatted_message = message
-            
+
             # Log using the structured logger
-            self.logger.log(formatted_message, level=internal_level, category=category, auxiliary=auxiliary)
-                
+            self.logger.log(
+                formatted_message,
+                level=internal_level,
+                category=category,
+                auxiliary=auxiliary,
+            )
+
         except Exception as e:
             self.logger.error(f"Error processing log message: {str(e)}")
 
-    def _log(self, message: str, level: int = 1, category: str = None, auxiliary: dict = None):
+    def _log(
+        self, message: str, level: int = 1, category: str = None, auxiliary: dict = None
+    ):
         """
         Enhanced logging method that uses the StagehandLogger.
-        
+
         Args:
             message: The message to log
             level: Verbosity level (0=error, 1=info, 2=detailed, 3=debug)
@@ -321,7 +334,9 @@ class Stagehand(StagehandBase):
                 )
                 if response.status_code != 200:
                     error_message = response.text
-                    self.logger.error(f"[HTTP ERROR] Status {response.status_code}: {error_message}")
+                    self.logger.error(
+                        f"[HTTP ERROR] Status {response.status_code}: {error_message}"
+                    )
                     return None
 
                 return response.json()  # Return the raw response as the result
@@ -333,7 +348,9 @@ class Stagehand(StagehandBase):
             )
             if response.status_code != 200:
                 error_message = response.text
-                self.logger.error(f"[HTTP ERROR] Status {response.status_code}: {error_message}")
+                self.logger.error(
+                    f"[HTTP ERROR] Status {response.status_code}: {error_message}"
+                )
                 return None
 
             for line in response.iter_lines(decode_unicode=True):
@@ -350,12 +367,16 @@ class Stagehand(StagehandBase):
                     if msg_type == "system":
                         status = message.get("data", {}).get("status")
                         if status == "error":
-                            error_msg = message.get("data", {}).get("error", "Unknown error")
+                            error_msg = message.get("data", {}).get(
+                                "error", "Unknown error"
+                            )
                             self.logger.error(f"[ERROR] {error_msg}")
                             raise RuntimeError(f"Server returned error: {error_msg}")
                         elif status == "finished":
                             result = message.get("data", {}).get("result")
-                            self.logger.debug("[SYSTEM] Operation completed successfully")
+                            self.logger.debug(
+                                "[SYSTEM] Operation completed successfully"
+                            )
                             return result
                     elif msg_type == "log":
                         # Process log message using _handle_log

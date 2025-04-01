@@ -6,15 +6,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand.sync import Stagehand, SyncAgent
-from stagehand import StagehandConfig, AgentConfig
-from stagehand.utils import configure_logging, StagehandLogger
+from stagehand.sync import Stagehand
+from stagehand import StagehandConfig, Agent, AgentConfig, configure_logging
 from stagehand.schemas import AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
     {
-        "info": "bold white",
+        "info": "cyan",
         "success": "green",
         "warning": "yellow",
         "error": "red bold",
@@ -31,7 +30,6 @@ load_dotenv()
 # Configure logging with the utility function
 configure_logging(
     level=logging.INFO,  # Set to INFO for regular logs, DEBUG for detailed
-    use_rich=True,       # Use Rich for colorized output
     quiet_dependencies=True,  # Reduce noise from dependencies
 )
 
@@ -60,15 +58,13 @@ def main():
         wait_for_captcha_solves=True,
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
-        # Set verbosity level here. This affects both the server and client logs.
-        verbose=2,  # Change to 1 for minimal, 2 for medium, 3 for detailed
+        verbose=2,
     )
 
     # Create a Stagehand client using the configuration object.
     stagehand = Stagehand(
         config=config, 
         server_url=os.getenv("STAGEHAND_SERVER_URL"),
-        use_rich_logging=True  # Enable rich formatting for logs
     )
 
     # Initialize - this creates a new session automatically.
@@ -94,11 +90,13 @@ def main():
         auto_screenshot=True,
     )
 
+    # Navigate to google
     console.print("\n▶️ [highlight] Navigating[/] to Google")
     stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
     console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
+    # Execute the agent task using the new agent interface
     agent_result = stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")

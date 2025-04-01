@@ -1,29 +1,31 @@
-import logging
-import json
 import asyncio
-from typing import Any, Callable, Dict, Optional, Union
+import json
+import logging
 from datetime import datetime
+from typing import Any, Callable, Dict, Optional
+
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.syntax import Syntax
-from rich.theme import Theme
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
-from rich import print as rich_print
+from rich.theme import Theme
 
 # Custom theme for Rich
-stagehand_theme = Theme({
-    "info": "cyan",
-    "warning": "yellow",
-    "error": "bold red",
-    "debug": "bold white",
-    "category": "bold blue",
-    "auxiliary": "white",
-    "timestamp": "dim white",
-    "success": "bold white",
-    "pending": "bold yellow",
-    "ellipsis": "bold white",
-})
+stagehand_theme = Theme(
+    {
+        "info": "cyan",
+        "warning": "yellow",
+        "error": "bold red",
+        "debug": "bold white",
+        "category": "bold blue",
+        "auxiliary": "white",
+        "timestamp": "dim white",
+        "success": "bold white",
+        "pending": "bold yellow",
+        "ellipsis": "bold white",
+    }
+)
 
 # Create console instance with theme
 console = Console(theme=stagehand_theme)
@@ -46,17 +48,17 @@ if not logger.handlers:
 
 
 def configure_logging(
-    level=logging.INFO, 
+    level=logging.INFO,
     format_str=None,
     datefmt="%Y-%m-%d %H:%M:%S",
     quiet_dependencies=True,
     utils_level=None,
     remove_logger_name=True,
-    use_rich=True
+    use_rich=True,
 ):
     """
     Configure logging for Stagehand with sensible defaults.
-    
+
     Args:
         level: The logging level for Stagehand loggers (default: INFO)
         format_str: The format string for log messages (default: depends on remove_logger_name)
@@ -72,7 +74,7 @@ def configure_logging(
             format_str = "%(asctime)s - %(levelname)s - %(message)s"
         else:
             format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     # Configure root logger with custom format
     if use_rich:
         # Use Rich handler for root logger
@@ -82,13 +84,13 @@ def configure_logging(
             datefmt=datefmt,
             handlers=[
                 RichHandler(
-                    rich_tracebacks=True, 
-                    markup=True, 
+                    rich_tracebacks=True,
+                    markup=True,
                     console=console,
                     show_time=False,
                     show_level=False,
                 )
-            ]
+            ],
         )
     else:
         # Use standard handler
@@ -97,14 +99,14 @@ def configure_logging(
             format=format_str,
             datefmt=datefmt,
         )
-    
+
     # Configure Stagehand logger to use the specified level
     logging.getLogger("stagehand").setLevel(level)
-    
+
     # Set specific level for utils logger if specified
     if utils_level is not None:
         logging.getLogger("stagehand.utils").setLevel(utils_level)
-    
+
     # Set higher log levels for noisy dependencies
     if quiet_dependencies:
         logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -117,10 +119,16 @@ class StagehandLogger:
     Enhanced Python equivalent of the TypeScript StagehandLogger class.
     Provides structured logging with improved formatting using Rich.
     """
-    def __init__(self, verbose: int = 1, external_logger: Optional[Callable] = None, use_rich: bool = True):
+
+    def __init__(
+        self,
+        verbose: int = 1,
+        external_logger: Optional[Callable] = None,
+        use_rich: bool = True,
+    ):
         """
         Initialize the logger with specified verbosity and optional external logger.
-        
+
         Args:
             verbose: Verbosity level (0=error only, 1=info, 2=detailed, 3=debug)
             external_logger: Optional callback function for log events
@@ -130,41 +138,36 @@ class StagehandLogger:
         self.external_logger = external_logger
         self.use_rich = use_rich
         self.console = console
-        
+
         # Map our verbosity levels to Python's logging levels
         self.level_map = {
-            0: logging.ERROR,    # Critical errors only
-            1: logging.INFO,     # Standard information
+            0: logging.ERROR,  # Critical errors only
+            1: logging.INFO,  # Standard information
             2: logging.WARNING,  # More detailed info (using WARNING level)
-            3: logging.DEBUG     # Debug information
+            3: logging.DEBUG,  # Debug information
         }
-        
+
         # Map level to style names
-        self.level_style = {
-            0: "error",
-            1: "info", 
-            2: "warning",
-            3: "debug"
-        }
-        
+        self.level_style = {0: "error", 1: "info", 2: "warning", 3: "debug"}
+
         # Update logger level based on verbosity
         self._set_verbosity(verbose)
-    
+
     def _set_verbosity(self, level: int):
         """Set the logger verbosity level"""
         self.verbose = level
         logger.setLevel(self.level_map.get(level, logging.INFO))
-    
+
     def _format_json(self, data: dict) -> str:
         """Format JSON data nicely with syntax highlighting"""
         if not self.use_rich:
             return json.dumps(data, indent=2)
-            
+
         # Create a nice-looking JSON string with syntax highlighting
         json_str = json.dumps(data, indent=2)
         syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
         return syntax
-    
+
     def _format_message_with_json(self, message: str) -> str:
         """
         Parse and format any JSON-like structures within a message string.
@@ -178,22 +181,23 @@ class StagehandLogger:
                 return f"\n{json_str}"
             else:
                 return json.dumps(message, indent=2)
-        
+
         if not isinstance(message, str):
             # If not a string and not a dict, convert to string
             return str(message)
-            
+
         import re
-        
+
         # Function to replace dict-like patterns with formatted JSON
         def replace_dict(match):
             try:
                 # Handle Python dictionary format by safely evaluating it
                 # This converts string representation of Python dict to actual dict
                 import ast
+
                 dict_str = match.group(0)
                 dict_obj = ast.literal_eval(dict_str)
-                
+
                 # Format the dict as JSON
                 if self.use_rich:
                     json_str = json.dumps(dict_obj, indent=2)
@@ -203,69 +207,80 @@ class StagehandLogger:
             except (SyntaxError, ValueError):
                 # If parsing fails, return the original string
                 return match.group(0)
-        
+
         # Pattern to match Python dictionary literals
         pattern = r"(\{[^{}]*(\{[^{}]*\}[^{}]*)*\})"
-        
+
         # Replace dictionary patterns with formatted JSON
         return re.sub(pattern, replace_dict, message)
-    
-    def _format_fastify_log(self, message: str, auxiliary: Dict[str, Any] = None) -> tuple:
+
+    def _format_fastify_log(
+        self, message: str, auxiliary: Dict[str, Any] = None
+    ) -> tuple:
         """
         Special formatting for logs that come from the Fastify server.
         These often contain Python representations of JSON objects.
-        
+
         Returns:
             tuple: (formatted_message, formatted_auxiliary)
         """
         # Handle case where message is already a dictionary
         if isinstance(message, dict):
             # Extract the actual message and other fields
-            extracted_message = message.get('message', '')
-            category = message.get('category', '')
-            
+            extracted_message = message.get("message", "")
+            category = message.get("category", "")
+
             # Format any remaining data for display
             formatted_json = json.dumps(message, indent=2)
-            
+
             if self.use_rich:
                 syntax = Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
                 if category:
                     extracted_message = f"[{category}] {extracted_message}"
-                    
+
                 # Handle ellipses in message separately
                 if "..." in extracted_message:
-                    extracted_message = extracted_message.replace("...", "[ellipsis]...[/ellipsis]")
-                    
+                    extracted_message = extracted_message.replace(
+                        "...", "[ellipsis]...[/ellipsis]"
+                    )
+
                 return extracted_message, None
             else:
                 if category and not extracted_message.startswith(f"[{category}]"):
                     extracted_message = f"[{category}] {extracted_message}"
                 return extracted_message, None
-        
+
         # Check if this appears to be a string representation of a JSON object
-        elif isinstance(message, str) and (message.startswith("{'") or message.startswith("{")):
+        elif isinstance(message, str) and (
+            message.startswith("{'") or message.startswith("{")
+        ):
             try:
                 # Try to parse the message as a Python dict using ast.literal_eval
                 # This is safer than eval() for parsing Python literal structures
                 import ast
+
                 data = ast.literal_eval(message)
-                
+
                 # Extract the actual message and other fields
-                extracted_message = data.get('message', '')
-                category = data.get('category', '')
-                
+                extracted_message = data.get("message", "")
+                category = data.get("category", "")
+
                 # Format any remaining data for display
                 formatted_json = json.dumps(data, indent=2)
-                
+
                 if self.use_rich:
-                    syntax = Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
+                    syntax = Syntax(
+                        formatted_json, "json", theme="monokai", word_wrap=True
+                    )
                     if category:
                         extracted_message = f"[{category}] {extracted_message}"
-                        
+
                     # Handle ellipses in message separately
                     if "..." in extracted_message:
-                        extracted_message = extracted_message.replace("...", "[ellipsis]...[/ellipsis]")
-                        
+                        extracted_message = extracted_message.replace(
+                            "...", "[ellipsis]...[/ellipsis]"
+                        )
+
                     return extracted_message, None
                 else:
                     if category and not extracted_message.startswith(f"[{category}]"):
@@ -274,37 +289,37 @@ class StagehandLogger:
             except (SyntaxError, ValueError):
                 # If parsing fails, use the original message
                 pass
-        
+
         # For regular string messages that contain ellipses
         elif isinstance(message, str) and "..." in message:
             formatted_message = message.replace("...", "[ellipsis]...[/ellipsis]")
             return formatted_message, auxiliary
-                
+
         # Default: return the original message and auxiliary
         return message, auxiliary
-        
+
     def _format_auxiliary_compact(self, auxiliary: Dict[str, Any]) -> str:
         """Format auxiliary data in a compact, readable way"""
         if not auxiliary:
             return {}
-            
+
         # Clean and format the auxiliary data
         formatted = {}
-        
+
         for key, value in auxiliary.items():
             # Skip internal keys in normal logging
             if key in ["requestId", "elementId", "type"]:
                 continue
-                
+
             # Handle nested values that come from the API
             if isinstance(value, dict) and "value" in value:
                 extracted = value.get("value")
                 type_info = value.get("type")
-                
+
                 # Skip empty values
                 if not extracted:
                     continue
-                
+
                 # For nested objects with 'value' and 'type', use a cleaner representation
                 if isinstance(extracted, (dict, list)) and type_info == "object":
                     # For complex objects, keep the whole structure
@@ -321,14 +336,19 @@ class StagehandLogger:
             else:
                 # Handle direct values
                 formatted[key] = value
-                
+
         return formatted
-    
-    def log(self, message: str, level: int = 1, category: str = None, 
-            auxiliary: Dict[str, Any] = None):
+
+    def log(
+        self,
+        message: str,
+        level: int = 1,
+        category: str = None,
+        auxiliary: Dict[str, Any] = None,
+    ):
         """
         Log a message with structured data, with Rich formatting.
-        
+
         Args:
             message: The message to log
             level: Verbosity level (0=error, 1=info, 2=detailed, 3=debug)
@@ -338,55 +358,70 @@ class StagehandLogger:
         # Skip logging if below current verbosity level
         if level > self.verbose and level != 0:  # Always log errors (level 0)
             return
-        
+
         # Get level style
         level_style = self.level_style.get(level, "info")
-        
+
         # Check for Fastify server logs and format them specially
-        formatted_message, formatted_auxiliary = self._format_fastify_log(message, auxiliary)
-        
+        formatted_message, formatted_auxiliary = self._format_fastify_log(
+            message, auxiliary
+        )
+
         # Process the auxiliary data if it wasn't handled by the Fastify formatter
         if formatted_auxiliary is None:
             aux_data = None
         else:
             # For regular messages, apply JSON formatting
             formatted_message = self._format_message_with_json(formatted_message)
-            aux_data = self._format_auxiliary_compact(formatted_auxiliary or auxiliary) if auxiliary else {}
-        
+            aux_data = (
+                self._format_auxiliary_compact(formatted_auxiliary or auxiliary)
+                if auxiliary
+                else {}
+            )
+
         # Format the log message
         if self.use_rich:
             # Format the timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
             # Special handling for specific categories
             if category in ["action", "navigation"]:
                 # Success marker for completed actions
-                if "Navigated to" in formatted_message or "Clicked on" in formatted_message:
-                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [success]✓[/success] {formatted_message}")
+                if (
+                    "Navigated to" in formatted_message
+                    or "Clicked on" in formatted_message
+                ):
+                    self.console.print(
+                        f"[timestamp]{timestamp}[/timestamp] [success]✓[/success] {formatted_message}"
+                    )
                 else:
                     # Pending action marker
-                    self.console.print(f"[timestamp]{timestamp}[/timestamp] [pending]→[/pending] {formatted_message}")
+                    self.console.print(
+                        f"[timestamp]{timestamp}[/timestamp] [pending]→[/pending] {formatted_message}"
+                    )
                 return
-                
+
             # For captcha category, show a more compact format
             if category == "captcha":
-                self.console.print(f"[timestamp]{timestamp}[/timestamp] [info]⏳[/info] {formatted_message}")
+                self.console.print(
+                    f"[timestamp]{timestamp}[/timestamp] [info]⏳[/info] {formatted_message}"
+                )
                 return
-                
+
             # Create the line prefix
             line_prefix = f"[timestamp]{timestamp}[/timestamp] [{level_style}]{level_style.upper()}[/{level_style}]"
-            
+
             # Add category if present
             if category:
                 line_prefix += f" [category]{category}[/category]"
-                
+
             # Add the message
             log_line = f"{line_prefix} - {formatted_message}"
-            
+
             # Handle ellipses in the log line
             if "..." in log_line and "[ellipsis]" not in log_line:
                 log_line = log_line.replace("...", "[ellipsis]...[/ellipsis]")
-            
+
             # Add auxiliary data if we have it and it's processed
             if aux_data:
                 if isinstance(aux_data, dict) and len(aux_data) <= 2:
@@ -398,41 +433,43 @@ class StagehandLogger:
                             items.append(f"{k}={v[:47]}...")
                         else:
                             items.append(f"{k}={v}")
-                    
-                    # Add as inline content with soft styling  
+
+                    # Add as inline content with soft styling
                     if items:
                         log_line += f" [auxiliary]({', '.join(items)})[/auxiliary]"
                 elif aux_data is not None:
                     # We'll print auxiliary data separately
                     self.console.print(log_line)
-                    
+
                     # Create a table for structured display of auxiliary data
                     table = Table(show_header=False, box=None, padding=(0, 1, 0, 1))
                     table.add_column("Key", style="cyan")
                     table.add_column("Value")
-                    
+
                     for k, v in aux_data.items():
                         if isinstance(v, (dict, list)):
                             # Format complex value as JSON
                             table.add_row(k, str(self._format_json(v)))
-                        elif isinstance(v, str) and v.startswith(('http://', 'https://')):
+                        elif isinstance(v, str) and v.startswith(
+                            ("http://", "https://")
+                        ):
                             # Highlight URLs
                             table.add_row(k, f"[link]{v}[/link]")
                         else:
                             table.add_row(k, str(v))
-                    
+
                     # Print the table with a subtle panel
                     self.console.print(Panel(table, expand=False, border_style="dim"))
                     return
-            
+
             # Print the log line
             self.console.print(log_line)
-                
+
         else:
             # Standard logging
             prefix = f"[{category}] " if category else ""
             log_message = f"{prefix}{formatted_message}"
-            
+
             # Add auxiliary data in a clean format if present
             if auxiliary:
                 # Format auxiliary data
@@ -442,9 +479,14 @@ class StagehandLogger:
                     if isinstance(value, dict) and "value" in value:
                         extracted_value = value["value"]
                         # Handle different value types appropriately
-                        if isinstance(extracted_value, str) and len(extracted_value) > 80:
+                        if (
+                            isinstance(extracted_value, str)
+                            and len(extracted_value) > 80
+                        ):
                             # Keep URLs and IDs intact
-                            if any(term in key.lower() for term in ["url", "id", "link"]):
+                            if any(
+                                term in key.lower() for term in ["url", "id", "link"]
+                            ):
                                 aux_parts.append(f"{key}={extracted_value}")
                             else:
                                 aux_parts.append(f"{key}={extracted_value[:77]}...")
@@ -456,11 +498,11 @@ class StagehandLogger:
                             aux_parts.append(f"{key}={value[:77]}...")
                         else:
                             aux_parts.append(f"{key}={str(value)}")
-                
+
                 # Add formatted auxiliary data
                 if aux_parts:
                     log_message += f" ({', '.join(aux_parts)})"
-            
+
             # Log with appropriate level
             if level == 0:
                 logger.error(log_message)
@@ -470,7 +512,7 @@ class StagehandLogger:
                 logger.warning(log_message)
             elif level == 3:
                 logger.debug(log_message)
-        
+
         # Call external logger if provided (handle async function)
         if self.external_logger:
             # Format log data similar to TS LogLine structure
@@ -483,7 +525,7 @@ class StagehandLogger:
                 log_data["category"] = category
             if auxiliary:
                 log_data["auxiliary"] = auxiliary
-            
+
             # Handle async callback properly
             if asyncio.iscoroutinefunction(self.external_logger):
                 # Create a task but don't wait for it - this avoids blocking
@@ -494,28 +536,40 @@ class StagehandLogger:
                         asyncio.create_task(self.external_logger(log_data))
                     else:
                         # We're not in an async context, log a warning
-                        logger.warning("Async external logger provided but not in async context - skipping callback")
+                        logger.warning(
+                            "Async external logger provided but not in async context - skipping callback"
+                        )
                 except RuntimeError:
                     # No event loop running, log a warning
-                    logger.warning("Async external logger provided but no event loop running - skipping callback")
+                    logger.warning(
+                        "Async external logger provided but no event loop running - skipping callback"
+                    )
             else:
                 # Synchronous callback, just call directly
                 self.external_logger(log_data)
-    
+
     # Convenience methods
-    def error(self, message: str, category: str = None, auxiliary: Dict[str, Any] = None):
+    def error(
+        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+    ):
         """Log an error message (level 0)"""
         self.log(message, level=0, category=category, auxiliary=auxiliary)
-    
-    def info(self, message: str, category: str = None, auxiliary: Dict[str, Any] = None):
+
+    def info(
+        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+    ):
         """Log an info message (level 1)"""
         self.log(message, level=1, category=category, auxiliary=auxiliary)
-    
-    def warning(self, message: str, category: str = None, auxiliary: Dict[str, Any] = None):
+
+    def warning(
+        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+    ):
         """Log a warning/detailed message (level 2)"""
         self.log(message, level=2, category=category, auxiliary=auxiliary)
-    
-    def debug(self, message: str, category: str = None, auxiliary: Dict[str, Any] = None):
+
+    def debug(
+        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+    ):
         """Log a debug message (level 3)"""
         self.log(message, level=3, category=category, auxiliary=auxiliary)
 
@@ -530,27 +584,30 @@ def sync_log_handler(log_data: dict[str, Any]) -> None:
     level = log_data.get("level", 1)
     if isinstance(level, str):
         level = {"error": 0, "info": 1, "warning": 2, "debug": 3}.get(level.lower(), 1)
-    
+
     message = log_data.get("message", "")
     category = log_data.get("category", "")
     auxiliary = {}
-    
+
     # Process auxiliary data if present
     if "auxiliary" in log_data:
         auxiliary = log_data.get("auxiliary", {})
-        
+
         # Convert string representation to actual object if needed
-        if isinstance(auxiliary, str) and (auxiliary.startswith("{") or auxiliary.startswith("{'")): 
+        if isinstance(auxiliary, str) and (
+            auxiliary.startswith("{") or auxiliary.startswith("{'")
+        ):
             try:
                 import ast
+
                 auxiliary = ast.literal_eval(auxiliary)
             except (SyntaxError, ValueError):
                 # If parsing fails, keep as string
                 pass
-    
+
     # Create a temporary logger to handle
     temp_logger = StagehandLogger(verbose=3, use_rich=True, external_logger=None)
-    
+
     try:
         # Use the logger to format and display the message
         temp_logger.log(message, level=level, category=category, auxiliary=auxiliary)
@@ -568,7 +625,7 @@ async def default_log_handler(log_data: dict[str, Any]) -> None:
     """
     Enhanced default handler for log messages from the Stagehand server.
     Uses Rich for pretty printing and JSON formatting.
-    
+
     This is an async function but calls the synchronous implementation.
     """
     sync_log_handler(log_data)

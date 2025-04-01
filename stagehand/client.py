@@ -1,7 +1,5 @@
 import asyncio
 import json
-import logging
-import time
 from collections.abc import Awaitable
 from typing import Any, Callable, Optional
 
@@ -13,11 +11,12 @@ from .agent import Agent
 from .base import StagehandBase
 from .config import StagehandConfig
 from .page import StagehandPage
-from .utils import convert_dict_keys_to_camel_case, default_log_handler, StagehandLogger
+from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
 
 # Note: No need to create a global logger here since we're using StagehandLogger from utils.py
+
 
 class Stagehand(StagehandBase):
     """
@@ -96,8 +95,10 @@ class Stagehand(StagehandBase):
         )
 
         # Initialize the centralized logger with the specified verbosity
-        self.logger = StagehandLogger(verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging)
-        
+        self.logger = StagehandLogger(
+            verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
+        )
+
         self.httpx_client = httpx_client
         self.timeout_settings = timeout_settings or httpx.Timeout(
             connect=180.0,
@@ -206,7 +207,7 @@ class Stagehand(StagehandBase):
         # Wrap with StagehandPage
         self.logger.debug("Wrapping Playwright page in StagehandPage")
         self.page = StagehandPage(self._playwright_page, self)
-        
+
         # Initialize agent
         self.logger.debug("Initializing Agent")
         self.agent = Agent(self)
@@ -271,26 +272,29 @@ class Stagehand(StagehandBase):
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
             "verbose": self.verbose,
             "browserbaseSessionCreateParams": {
-              "browserSettings": {
-                  "blockAds": True,
-                  "viewport": {
-                      "width": 1024,
-                      "height": 768,
-                  },
-              },
+                "browserSettings": {
+                    "blockAds": True,
+                    "viewport": {
+                        "width": 1024,
+                        "height": 768,
+                    },
+                },
             },
         }
 
         # Add the new parameters if they have values
         if hasattr(self, "self_heal") and self.self_heal is not None:
             payload["selfHeal"] = self.self_heal
-            
-        if hasattr(self, "wait_for_captcha_solves") and self.wait_for_captcha_solves is not None:
+
+        if (
+            hasattr(self, "wait_for_captcha_solves")
+            and self.wait_for_captcha_solves is not None
+        ):
             payload["waitForCaptchaSolves"] = self.wait_for_captcha_solves
-            
+
         if hasattr(self, "act_timeout_ms") and self.act_timeout_ms is not None:
             payload["actTimeoutMs"] = self.act_timeout_ms
-            
+
         if hasattr(self, "system_prompt") and self.system_prompt:
             payload["systemPrompt"] = self.system_prompt
 
@@ -365,12 +369,16 @@ class Stagehand(StagehandBase):
                     if response.status_code != 200:
                         error_text = await response.aread()
                         error_message = error_text.decode("utf-8")
-                        self.logger.error(f"[HTTP ERROR] Status {response.status_code}: {error_message}")
-                        raise RuntimeError(f"Request failed with status {response.status_code}: {error_message}")
+                        self.logger.error(
+                            f"[HTTP ERROR] Status {response.status_code}: {error_message}"
+                        )
+                        raise RuntimeError(
+                            f"Request failed with status {response.status_code}: {error_message}"
+                        )
 
                     self.logger.debug("[STREAM] Processing server response")
                     result = None
-                    
+
                     async for line in response.aiter_lines():
                         # Skip empty lines
                         if not line.strip():
@@ -379,7 +387,7 @@ class Stagehand(StagehandBase):
                         try:
                             # Handle SSE-style messages that start with "data: "
                             if line.startswith("data: "):
-                                line = line[len("data: "):]
+                                line = line[len("data: ") :]
 
                             message = json.loads(line)
                             # Handle different message types
@@ -388,12 +396,18 @@ class Stagehand(StagehandBase):
                             if msg_type == "system":
                                 status = message.get("data", {}).get("status")
                                 if status == "error":
-                                    error_msg = message.get("data", {}).get("error", "Unknown error")
+                                    error_msg = message.get("data", {}).get(
+                                        "error", "Unknown error"
+                                    )
                                     self.logger.error(f"[ERROR] {error_msg}")
-                                    raise RuntimeError(f"Server returned error: {error_msg}")
+                                    raise RuntimeError(
+                                        f"Server returned error: {error_msg}"
+                                    )
                                 elif status == "finished":
                                     result = message.get("data", {}).get("result")
-                                    self.logger.debug(f"[SYSTEM] Operation completed successfully")
+                                    self.logger.debug(
+                                        "[SYSTEM] Operation completed successfully"
+                                    )
                             elif msg_type == "log":
                                 # Process log message using _handle_log
                                 await self._handle_log(message)
@@ -402,7 +416,7 @@ class Stagehand(StagehandBase):
                                 self.logger.debug(f"[UNKNOWN] Message type: {msg_type}")
                         except json.JSONDecodeError:
                             self.logger.warning(f"Could not parse line as JSON: {line}")
-                    
+
                     # Return the final result
                     return result
             except Exception as e:
@@ -416,53 +430,62 @@ class Stagehand(StagehandBase):
         """
         try:
             log_data = msg.get("data", {})
-            
+
             # Call user-provided callback with original data if available
             if self.on_log:
                 await self.on_log(log_data)
                 return
-                
+
             # Extract message, category, and level info
             message = log_data.get("message", "")
             category = log_data.get("category", "")
             level_str = log_data.get("level", "info")
             auxiliary = log_data.get("auxiliary", {})
-            
+
             # Map level strings to internal levels
             level_map = {
                 "debug": 3,
-                "info": 1, 
+                "info": 1,
                 "warning": 2,
                 "error": 0,
             }
-            
+
             # Convert string level to int if needed
             if isinstance(level_str, str):
                 internal_level = level_map.get(level_str.lower(), 1)
             else:
                 internal_level = min(level_str, 3)  # Ensure level is between 0-3
-            
+
             # Handle the case where message itself might be a JSON-like object
             if isinstance(message, dict):
                 # If message is a dict, just pass it directly to the logger
                 formatted_message = message
-            elif isinstance(message, str) and (message.startswith("{") and ":" in message):
+            elif isinstance(message, str) and (
+                message.startswith("{") and ":" in message
+            ):
                 # If message looks like JSON but isn't a dict yet, it will be handled by _format_fastify_log
                 formatted_message = message
             else:
                 # Regular message
                 formatted_message = message
-            
+
             # Log using the structured logger
-            self.logger.log(formatted_message, level=internal_level, category=category, auxiliary=auxiliary)
-                
+            self.logger.log(
+                formatted_message,
+                level=internal_level,
+                category=category,
+                auxiliary=auxiliary,
+            )
+
         except Exception as e:
             self.logger.error(f"Error processing log message: {str(e)}")
 
-    def _log(self, message: str, level: int = 1, category: str = None, auxiliary: dict = None):
+    def _log(
+        self, message: str, level: int = 1, category: str = None, auxiliary: dict = None
+    ):
         """
         Enhanced logging method that uses the StagehandLogger.
-        
+
         Args:
             message: The message to log
             level: Verbosity level (0=error, 1=info, 2=detailed, 3=debug)
