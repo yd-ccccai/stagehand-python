@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand import Stagehand, StagehandConfig, Agent, AgentConfig, configure_logging
+from stagehand import Stagehand, StagehandConfig, AgentConfig, configure_logging
 from stagehand.schemas import AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
@@ -29,13 +29,21 @@ load_dotenv()
 
 # Configure logging with the utility function
 configure_logging(
-    level=logging.WARNING,  # Feel free to change this to INFO or DEBUG to see more logs
+    level=logging.INFO,  # Set to INFO for regular logs, DEBUG for detailed
+    quiet_dependencies=True,  # Reduce noise from dependencies
 )
 
-# Set higher log levels for noisy libraries
-logging.getLogger("httpx").setLevel(logging.ERROR)
-logging.getLogger("httpcore").setLevel(logging.ERROR)
-logging.getLogger("asyncio").setLevel(logging.WARNING)
+console.print(
+    Panel.fit(
+        "[yellow]Logging Levels:[/]\n"
+        "[white]- Set [bold]verbose=0[/] for errors (ERROR)[/]\n"
+        "[white]- Set [bold]verbose=1[/] for minimal logs (INFO)[/]\n"
+        "[white]- Set [bold]verbose=2[/] for medium logs (WARNING)[/]\n"
+        "[white]- Set [bold]verbose=3[/] for detailed logs (DEBUG)[/]",
+        title="Verbosity Options",
+        border_style="blue",
+    )
+)
 
 async def main():
     # Build a unified configuration object for Stagehand
@@ -48,7 +56,6 @@ async def main():
         model_name="gpt-4o",
         self_heal=True,
         wait_for_captcha_solves=True,
-        act_timeout_ms=60000,  # 60 seconds timeout for actions
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
         verbose=2,
@@ -56,7 +63,8 @@ async def main():
 
     # Create a Stagehand client using the configuration object.
     stagehand = Stagehand(
-        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2
+        config=config, 
+        server_url=os.getenv("STAGEHAND_SERVER_URL"),
     )
 
     # Initialize - this creates a new session automatically.

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, field_serializer, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 # Default extraction schema that matches the TypeScript version
 DEFAULT_EXTRACT_SCHEMA = {
@@ -156,7 +156,7 @@ class ObserveOptions(StagehandBaseModel):
 class ObserveResult(StagehandBaseModel):
     """
     Result of the 'observe' command.
-    
+
     Attributes:
         selector (str): The selector of the observed element.
         description (str): The description of the observed element.
@@ -183,6 +183,7 @@ class ObserveResult(StagehandBaseModel):
 
 class AgentProvider(str, Enum):
     """Supported agent providers"""
+
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
 
@@ -190,14 +191,14 @@ class AgentProvider(str, Enum):
 class AgentConfig(StagehandBaseModel):
     """
     Configuration for agent execution.
-    
+
     Attributes:
         provider (Optional[AgentProvider]): The provider to use (openai or anthropic).
         model (Optional[str]): The model name to use.
         instructions (Optional[str]): Custom instructions for the agent.
         options (Optional[dict[str, Any]]): Additional provider-specific options.
     """
-    
+
     provider: Optional[AgentProvider] = None
     model: Optional[str] = None
     instructions: Optional[str] = None
@@ -207,7 +208,7 @@ class AgentConfig(StagehandBaseModel):
 class AgentExecuteOptions(StagehandBaseModel):
     """
     Options for agent execution.
-    
+
     Attributes:
         instruction (str): The task instruction for the agent.
         max_steps (Optional[int]): Maximum number of steps the agent can take.
@@ -215,7 +216,7 @@ class AgentExecuteOptions(StagehandBaseModel):
         wait_between_actions (Optional[int]): Milliseconds to wait between actions.
         context (Optional[str]): Additional context for the agent.
     """
-    
+
     instruction: str = Field(..., description="The task instruction for the agent.")
     max_steps: Optional[int] = None
     auto_screenshot: Optional[bool] = None
@@ -226,13 +227,13 @@ class AgentExecuteOptions(StagehandBaseModel):
 class AgentExecuteResult(StagehandBaseModel):
     """
     Result of agent execution.
-    
+
     Attributes:
         success (bool): Whether the execution was successful.
         steps (Optional[list[dict[str, Any]]]): Steps taken by the agent.
         result (Optional[str]): Final result message from the agent.
     """
-    
+
     success: bool = Field(..., description="Whether the execution was successful.")
     steps: Optional[list[dict[str, Any]]] = None
     result: Optional[str] = None

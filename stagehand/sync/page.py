@@ -132,15 +132,15 @@ class SyncStagehandPage:
 
     def extract(self, options: Union[str, ExtractOptions] = None) -> ExtractResult:
         """
-                Extract data using AI via the Stagehand server synchronously.
+        Extract data using AI via the Stagehand server synchronously.
 
-                Args:
-                    options (Union[str, ExtractOptions], optional): The extraction options describing
-                        what to extract and how. This can be either a string with an instruction or 
-                        an ExtractOptions object. If None, extracts the entire page content.
+        Args:
+            options (Union[str, ExtractOptions], optional): The extraction options describing
+                what to extract and how. This can be either a string with an instruction or
+                an ExtractOptions object. If None, extracts the entire page content.
 
-                Returns:
-                    ExtractResult: The result from the Stagehand server's extraction execution.
+        Returns:
+            ExtractResult: The result from the Stagehand server's extraction execution.
         """
         # Allow for no options to extract the entire page
         if options is None:
@@ -157,11 +157,11 @@ class SyncStagehandPage:
         if isinstance(result, dict):
             return ExtractResult(**result)
         return result
-        
+
     def screenshot(self, options: Optional[dict] = None) -> str:
         """
         Take a screenshot of the current page via the Stagehand server synchronously.
-        
+
         Args:
             options (Optional[dict]): Optional screenshot options.
                 May include:
@@ -170,14 +170,14 @@ class SyncStagehandPage:
                 - quality: for jpeg only, 0-100 (default: 80)
                 - clip: viewport clip rectangle
                 - omitBackground: whether to hide default white background (default: False)
-                
+
         Returns:
             str: Base64-encoded screenshot data.
         """
         payload = options or {}
-        
+
         result = self._stagehand._execute("screenshot", payload)
-        
+
         return result
 
     # Forward other Page methods to underlying Playwright page
