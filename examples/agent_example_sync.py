@@ -100,10 +100,22 @@ def main():
     agent_result = stagehand.agent.execute(agent_config, execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")
+    console.print(f"✅ Success: [bold]{'Yes' if agent_result.success else 'No'}[/]")
+    console.print(f"🎯 Completed: [bold]{'Yes' if agent_result.completed else 'No'}[/]")
+    if agent_result.message:
+        console.print(f"💬 Message: [italic]{agent_result.message}[/]")
+    
+    if agent_result.actions:
+        console.print(f"🔄 Actions performed: [bold]{len(agent_result.actions)}[/]")
+        for i, action in enumerate(agent_result.actions):
+            console.print(f"  Action {i+1}: {action.get('type', 'Unknown')} - {action.get('description', 'No description')}")
+    
+    # For debugging, you can also print the full JSON
+    console.print("[dim]Full response JSON:[/]")
     console.print_json(f"{agent_result.model_dump_json()}")
 
     # Close the session
-    console.print("\n⏹️ [warning]Closing session...[/]")
+    console.print("\n⏹️  [warning]Closing session...[/]")
     stagehand.close()
     console.print("✅ [success]Session closed successfully![/]")
     console.rule("[bold]End of Example[/]")

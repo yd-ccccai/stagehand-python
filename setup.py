@@ -5,7 +5,7 @@ with open("README.md", encoding="utf-8") as fh:
 
 setup(
     name="stagehand-py",
-    version="0.3.3",
+    version="0.3.4",
     author="Browserbase, Inc.",
     author_email="support@browserbase.io",
     description="Python SDK for Stagehand",
@@ -13,6 +13,9 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/browserbase/stagehand-python-sdk",
     packages=find_packages(),
+    package_data={
+        "stagehand": ["domScripts.js"],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

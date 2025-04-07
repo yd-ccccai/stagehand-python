@@ -97,6 +97,8 @@ async def main():
     await page.act("search for openai")
     await page.keyboard.press("Enter")
     console.print("✅ [success]Performing Action:[/] Action completed successfully")
+    
+    await asyncio.sleep(2)
 
     console.print("\n▶️ [highlight] Observing page[/] for news button")
     observed = await page.observe("find the news button on the page")
@@ -116,7 +118,7 @@ async def main():
     console.print_json(f"{data.model_dump_json()}")
 
     # Close the session
-    console.print("\n⏹️ [warning]Closing session...[/]")
+    console.print("\n⏹️  [warning]Closing session...[/]")
     await stagehand.close()
     console.print("✅ [success]Session closed successfully![/]")
     console.rule("[bold]End of Example[/]")
