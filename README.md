@@ -68,7 +68,7 @@ pip install stagehand-py
 ```
 ## Requirements
 
-- Python 3.7+
+- Python 3.9+
 - httpx (for async client)
 - requests (for sync client)
 - asyncio (for async client)
@@ -81,6 +81,18 @@ You can simply run:
 
 ```bash
 pip install -r requirements.txt
+```
+
+**requirements.txt**
+```txt
+httpx>=0.24.0
+asyncio>=3.4.3 
+python-dotenv>=1.0.0
+pydantic>=1.10.0
+playwright>=1.42.1
+requests>=2.31.0
+rich
+browserbase
 ```
 
 
@@ -105,7 +117,8 @@ Stagehand supports both synchronous and asynchronous usage. Here are examples fo
 
 ```python
 import os
-from stagehand.sync import Stagehand, StagehandConfig
+from stagehand.sync import Stagehand
+from stagehand import StagehandConfig
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -207,7 +220,8 @@ if __name__ == "__main__":
 
 ```python
 import os
-from stagehand.sync import Stagehand, StagehandConfig
+from stagehand.sync import Stagehand
+from stagehand import StagehandConfig
 from stagehand.schemas import AgentConfig, AgentExecuteOptions, AgentProvider
 from dotenv import load_dotenv
 
@@ -331,7 +345,7 @@ Stagehand can be configured via environment variables or through a `StagehandCon
 Example using a unified configuration:
 
 ```python
-from stagehand.config import StagehandConfig
+from stagehand import StagehandConfig
 import os
 
 config = StagehandConfig(
