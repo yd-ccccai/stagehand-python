@@ -1,5 +1,6 @@
 import asyncio
 import json
+import browserbase
 from collections.abc import Awaitable
 from typing import Any, Callable, Optional
 
@@ -177,11 +178,6 @@ class Stagehand(StagehandBase):
         # Start Playwright and connect to remote
         self.logger.debug("Starting Playwright...")
         self._playwright = await async_playwright().start()
-
-        # connect_url = (
-        #     f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
-        #     f"&sessionId={self.session_id}"
-        # )
         
         session = await browserbase.client.sessions.retrieve(self.session_id)
         connect_url = session.connectUrl
