@@ -1,3 +1,4 @@
+import browserbase
 import json
 import logging
 from typing import Any, Callable, Optional
@@ -97,10 +98,9 @@ class Stagehand(StagehandBase):
         self.logger.debug("Starting Playwright...")
         self._playwright = sync_playwright().start()
 
-        connect_url = (
-            f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
-            f"&sessionId={self.session_id}"
-        )
+        session = browserbase.client.sessions.retrieve(self.session_id)
+        connect_url = session.connectUrl
+        
         self.logger.debug(f"Connecting to remote browser at: {connect_url}")
         self._browser = self._playwright.chromium.connect_over_cdp(connect_url)
         self.logger.debug(f"Connected to remote browser: {self._browser}")

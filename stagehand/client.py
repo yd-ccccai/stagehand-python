@@ -178,11 +178,16 @@ class Stagehand(StagehandBase):
         self.logger.debug("Starting Playwright...")
         self._playwright = await async_playwright().start()
 
-        connect_url = (
-            f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
-            f"&sessionId={self.session_id}"
-        )
+        # connect_url = (
+        #     f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
+        #     f"&sessionId={self.session_id}"
+        # )
+        
+        session = await browserbase.client.sessions.retrieve(self.session_id)
+        connect_url = session.connectUrl
+
         self.logger.debug(f"Connecting to remote browser at: {connect_url}")
+
         self._browser = await self._playwright.chromium.connect_over_cdp(connect_url)
         self.logger.debug(f"Connected to remote browser: {self._browser}")
 
