@@ -4,6 +4,7 @@ from collections.abc import Awaitable
 from typing import Any, Callable, Optional
 
 import httpx
+from browserbase import Browserbase
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
@@ -170,19 +171,19 @@ class Stagehand(StagehandBase):
             await self._create_session()
             self.logger.debug(f"Created new session: {self.session_id}")
 
-        ###
-        # TODO: throw log for unauthorized (401) key not whitelisted
-        ###
-
         # Start Playwright and connect to remote
         self.logger.debug("Starting Playwright...")
         self._playwright = await async_playwright().start()
+        bb = Browserbase(api_key=self.browserbase_api_key)
+        try:
+            session = bb.sessions.retrieve(self.session_id)
+            connect_url = session.connectUrl
+        except Exception as e:
+            self.logger.error(f"Error retrieving session: {str(e)}")
+            raise
 
-        connect_url = (
-            f"wss://connect.browserbase.com?apiKey={self.browserbase_api_key}"
-            f"&sessionId={self.session_id}"
-        )
         self.logger.debug(f"Connecting to remote browser at: {connect_url}")
+
         self._browser = await self._playwright.chromium.connect_over_cdp(connect_url)
         self.logger.debug(f"Connected to remote browser: {self._browser}")
 
