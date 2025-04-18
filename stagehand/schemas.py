@@ -17,6 +17,7 @@ class AvailableModel(str, Enum):
     CLAUDE_3_5_SONNET_LATEST = "claude-3-5-sonnet-latest"
     CLAUDE_3_7_SONNET_LATEST = "claude-3-7-sonnet-latest"
     COMPUTER_USE_PREVIEW = "computer-use-preview"
+    GEMINI_2_0_FLASH = "gemini-2.0-flash"
 
 
 class StagehandBaseModel(BaseModel):
@@ -50,6 +51,7 @@ class ActOptions(StagehandBaseModel):
     slow_dom_based_act: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
     timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[str, Any]] = None
 
 
 class ActResult(StagehandBaseModel):
@@ -94,6 +96,7 @@ class ExtractOptions(StagehandBaseModel):
     )
     use_text_extract: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[Any, Any]] = None
 
     @field_serializer("schema_definition")
     def serialize_schema_definition(
@@ -151,6 +154,7 @@ class ObserveOptions(StagehandBaseModel):
     return_action: Optional[bool] = None
     draw_overlay: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[str, Any]] = None
 
 
 class ObserveResult(StagehandBaseModel):
