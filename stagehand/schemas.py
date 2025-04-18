@@ -106,8 +106,49 @@ class ExtractOptions(StagehandBaseModel):
         if isinstance(schema_definition, type) and issubclass(
             schema_definition, BaseModel
         ):
-            return schema_definition.model_json_schema()
-        return schema_definition
+            # Get the JSON schema using default ref_template ('#/$defs/{model}')
+            schema = schema_definition.model_json_schema()
+            
+            defs_key = '$defs'
+            if defs_key not in schema:
+                defs_key = 'definitions' 
+                if defs_key not in schema:
+                    return schema
+
+            definitions = schema.get(defs_key, {})
+            if definitions:
+                self._resolve_references(schema, definitions, f"#/{defs_key}/")
+                schema.pop(defs_key, None)
+            
+            return schema
+        
+        elif isinstance(schema_definition, dict):
+             return schema_definition
+        
+        raise TypeError("schema_definition must be a Pydantic model or a dict")
+        
+    def _resolve_references(self, obj: Any, definitions: dict, ref_prefix: str) -> None:
+        """Recursively resolve $ref references in a schema using definitions."""
+        if isinstance(obj, dict):
+            if "$ref" in obj and obj["$ref"].startswith(ref_prefix):
+                ref_name = obj["$ref"][len(ref_prefix):] # Get name after prefix
+                if ref_name in definitions:
+                    original_keys = {k: v for k, v in obj.items() if k != "$ref"}
+                    resolved_definition = definitions[ref_name].copy() # Use a copy
+                    self._resolve_references(resolved_definition, definitions, ref_prefix)
+                    
+                    obj.clear()
+                    obj.update(resolved_definition)
+                    obj.update(original_keys)
+            else:
+                # Recursively process all values in the dictionary
+                for key, value in obj.items():
+                    self._resolve_references(value, definitions, ref_prefix)
+        
+        elif isinstance(obj, list):
+            # Process all items in the list
+            for item in obj:
+                self._resolve_references(item, definitions, ref_prefix)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

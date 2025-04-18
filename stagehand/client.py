@@ -346,7 +346,7 @@ class Stagehand(StagehandBase):
             headers["x-model-api-key"] = self.model_api_key
 
         # Convert snake_case keys to camelCase for the API
-        modified_payload = convert_dict_keys_to_camel_case(modified_payload)
+        modified_payload = convert_dict_keys_to_camel_case(payload)
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self.logger.debug(f"\n==== EXECUTING {method.upper()} ====")
