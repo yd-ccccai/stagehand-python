@@ -236,11 +236,6 @@ class Stagehand(StagehandBase):
                 client = self.httpx_client or httpx.AsyncClient(
                     timeout=self.timeout_settings
                 )
-                headers = {
-                    "x-bb-api-key": self.browserbase_api_key,
-                    "x-bb-project-id": self.browserbase_project_id,
-                    "Content-Type": "application/json",
-                }
 
                 async with client:
                     await self._execute("end", {"sessionId": self.session_id})
