@@ -236,11 +236,6 @@ class Stagehand(StagehandBase):
                 client = self.httpx_client or httpx.AsyncClient(
                     timeout=self.timeout_settings
                 )
-                headers = {
-                    "x-bb-api-key": self.browserbase_api_key,
-                    "x-bb-project-id": self.browserbase_project_id,
-                    "Content-Type": "application/json",
-                }
 
                 async with client:
                     await self._execute("end", {"sessionId": self.session_id})
@@ -345,16 +340,8 @@ class Stagehand(StagehandBase):
         if self.model_api_key:
             headers["x-model-api-key"] = self.model_api_key
 
-        modified_payload = dict(payload)
-        if (
-            hasattr(self, "model_client_options")
-            and self.model_client_options
-            and "modelClientOptions" not in modified_payload
-        ):
-            modified_payload["modelClientOptions"] = self.model_client_options
-
         # Convert snake_case keys to camelCase for the API
-        modified_payload = convert_dict_keys_to_camel_case(modified_payload)
+        modified_payload = convert_dict_keys_to_camel_case(payload)
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self.logger.debug(f"\n==== EXECUTING {method.upper()} ====")

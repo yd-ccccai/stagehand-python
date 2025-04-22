@@ -1,5 +1,3 @@
-from typing import Dict
-
 from ..schemas import (
     AgentConfig,
     AgentExecuteOptions,
@@ -8,7 +6,7 @@ from ..schemas import (
 )
 
 # Model to provider mapping
-MODEL_TO_PROVIDER_MAP: Dict[str, AgentProvider] = {
+MODEL_TO_PROVIDER_MAP: dict[str, AgentProvider] = {
     "computer-use-preview": AgentProvider.OPENAI,
     "claude-3-5-sonnet-20240620": AgentProvider.ANTHROPIC,
     "claude-3-7-sonnet-20250219": AgentProvider.ANTHROPIC,
@@ -55,10 +53,10 @@ class SyncAgent:
         if agent_config.provider and isinstance(agent_config.provider, str):
             try:
                 agent_config.provider = AgentProvider(agent_config.provider.lower())
-            except ValueError:
+            except ValueError as e:
                 raise ValueError(
                     f"Invalid provider: {agent_config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}"
-                )
+                ) from e
 
         payload = {
             "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),

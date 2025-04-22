@@ -154,11 +154,6 @@ class Stagehand(StagehandBase):
         if self.session_id:
             try:
                 self.logger.debug(f"Ending session {self.session_id} on the server...")
-                headers = {
-                    "x-bb-api-key": self.browserbase_api_key,
-                    "x-bb-project-id": self.browserbase_project_id,
-                    "Content-Type": "application/json",
-                }
                 self._execute("end", {"sessionId": self.session_id})
                 self.logger.debug(f"Session {self.session_id} ended successfully")
             except Exception as e:

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -215,7 +215,7 @@ class StagehandLogger:
         return re.sub(pattern, replace_dict, message)
 
     def _format_fastify_log(
-        self, message: str, auxiliary: Dict[str, Any] = None
+        self, message: str, auxiliary: dict[str, Any] = None
     ) -> tuple:
         """
         Special formatting for logs that come from the Fastify server.
@@ -234,7 +234,7 @@ class StagehandLogger:
             formatted_json = json.dumps(message, indent=2)
 
             if self.use_rich:
-                syntax = Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
+                Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
                 if category:
                     extracted_message = f"[{category}] {extracted_message}"
 
@@ -269,9 +269,7 @@ class StagehandLogger:
                 formatted_json = json.dumps(data, indent=2)
 
                 if self.use_rich:
-                    syntax = Syntax(
-                        formatted_json, "json", theme="monokai", word_wrap=True
-                    )
+                    Syntax(formatted_json, "json", theme="monokai", word_wrap=True)
                     if category:
                         extracted_message = f"[{category}] {extracted_message}"
 
@@ -298,7 +296,7 @@ class StagehandLogger:
         # Default: return the original message and auxiliary
         return message, auxiliary
 
-    def _format_auxiliary_compact(self, auxiliary: Dict[str, Any]) -> str:
+    def _format_auxiliary_compact(self, auxiliary: dict[str, Any]) -> str:
         """Format auxiliary data in a compact, readable way"""
         if not auxiliary:
             return {}
@@ -344,7 +342,7 @@ class StagehandLogger:
         message: str,
         level: int = 1,
         category: str = None,
-        auxiliary: Dict[str, Any] = None,
+        auxiliary: dict[str, Any] = None,
     ):
         """
         Log a message with structured data, with Rich formatting.
@@ -550,25 +548,25 @@ class StagehandLogger:
 
     # Convenience methods
     def error(
-        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+        self, message: str, category: str = None, auxiliary: dict[str, Any] = None
     ):
         """Log an error message (level 0)"""
         self.log(message, level=0, category=category, auxiliary=auxiliary)
 
     def info(
-        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+        self, message: str, category: str = None, auxiliary: dict[str, Any] = None
     ):
         """Log an info message (level 1)"""
         self.log(message, level=1, category=category, auxiliary=auxiliary)
 
     def warning(
-        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+        self, message: str, category: str = None, auxiliary: dict[str, Any] = None
     ):
         """Log a warning/detailed message (level 2)"""
         self.log(message, level=2, category=category, auxiliary=auxiliary)
 
     def debug(
-        self, message: str, category: str = None, auxiliary: Dict[str, Any] = None
+        self, message: str, category: str = None, auxiliary: dict[str, Any] = None
     ):
         """Log a debug message (level 3)"""
         self.log(message, level=3, category=category, auxiliary=auxiliary)

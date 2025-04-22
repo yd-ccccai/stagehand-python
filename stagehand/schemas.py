@@ -17,6 +17,7 @@ class AvailableModel(str, Enum):
     CLAUDE_3_5_SONNET_LATEST = "claude-3-5-sonnet-latest"
     CLAUDE_3_7_SONNET_LATEST = "claude-3-7-sonnet-latest"
     COMPUTER_USE_PREVIEW = "computer-use-preview"
+    GEMINI_2_0_FLASH = "gemini-2.0-flash"
 
 
 class StagehandBaseModel(BaseModel):
@@ -50,6 +51,7 @@ class ActOptions(StagehandBaseModel):
     slow_dom_based_act: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
     timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[str, Any]] = None
 
 
 class ActResult(StagehandBaseModel):
@@ -94,6 +96,7 @@ class ExtractOptions(StagehandBaseModel):
     )
     use_text_extract: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[Any, Any]] = None
 
     @field_serializer("schema_definition")
     def serialize_schema_definition(
@@ -103,8 +106,51 @@ class ExtractOptions(StagehandBaseModel):
         if isinstance(schema_definition, type) and issubclass(
             schema_definition, BaseModel
         ):
-            return schema_definition.model_json_schema()
-        return schema_definition
+            # Get the JSON schema using default ref_template ('#/$defs/{model}')
+            schema = schema_definition.model_json_schema()
+
+            defs_key = "$defs"
+            if defs_key not in schema:
+                defs_key = "definitions"
+                if defs_key not in schema:
+                    return schema
+
+            definitions = schema.get(defs_key, {})
+            if definitions:
+                self._resolve_references(schema, definitions, f"#/{defs_key}/")
+                schema.pop(defs_key, None)
+
+            return schema
+
+        elif isinstance(schema_definition, dict):
+            return schema_definition
+
+        raise TypeError("schema_definition must be a Pydantic model or a dict")
+
+    def _resolve_references(self, obj: Any, definitions: dict, ref_prefix: str) -> None:
+        """Recursively resolve $ref references in a schema using definitions."""
+        if isinstance(obj, dict):
+            if "$ref" in obj and obj["$ref"].startswith(ref_prefix):
+                ref_name = obj["$ref"][len(ref_prefix) :]  # Get name after prefix
+                if ref_name in definitions:
+                    original_keys = {k: v for k, v in obj.items() if k != "$ref"}
+                    resolved_definition = definitions[ref_name].copy()  # Use a copy
+                    self._resolve_references(
+                        resolved_definition, definitions, ref_prefix
+                    )
+
+                    obj.clear()
+                    obj.update(resolved_definition)
+                    obj.update(original_keys)
+            else:
+                # Recursively process all values in the dictionary
+                for _, value in obj.items():
+                    self._resolve_references(value, definitions, ref_prefix)
+
+        elif isinstance(obj, list):
+            # Process all items in the list
+            for item in obj:
+                self._resolve_references(item, definitions, ref_prefix)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -151,6 +197,7 @@ class ObserveOptions(StagehandBaseModel):
     return_action: Optional[bool] = None
     draw_overlay: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[str, Any]] = None
 
 
 class ObserveResult(StagehandBaseModel):
