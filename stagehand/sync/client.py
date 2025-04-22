@@ -8,8 +8,8 @@ from playwright.sync_api import sync_playwright
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
-from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
 from ..llm.client import LLMClient
+from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
 from .agent import SyncAgent
 from .context import SyncStagehandContext
 from .page import SyncStagehandPage

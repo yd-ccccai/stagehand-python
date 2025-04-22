@@ -1,10 +1,11 @@
-import litellm
-from typing import List, Dict, Any, Optional
-import os
 import logging
+from typing import Any, Optional
+
+import litellm
 
 # Configure logger for the module
 logger = logging.getLogger(__name__)
+
 
 class LLMClient:
     """
@@ -17,7 +18,7 @@ class LLMClient:
         api_key: Optional[str] = None,
         default_model: Optional[str] = None,
         async_mode: bool = False,
-        **kwargs: Any, # To catch other potential litellm global settings
+        **kwargs: Any,  # To catch other potential litellm global settings
     ):
         """
         Initializes the LiteLLMClient.
@@ -41,26 +42,27 @@ class LLMClient:
         # Prefer environment variables for specific providers.
         if api_key:
             litellm.api_key = api_key
-            logger.warning("Set global litellm.api_key. Prefer provider-specific environment variables.")
+            logger.warning(
+                "Set global litellm.api_key. Prefer provider-specific environment variables."
+            )
 
         # Apply other global settings if provided
         for key, value in kwargs.items():
-             if hasattr(litellm, key):
-                 setattr(litellm, key, value)
-                 logger.debug(f"Set global litellm.{key}")
-             # Handle common aliases or expected config names if necessary
-             elif key == "api_base": # Example: map api_base if needed
-                 litellm.api_base = value
-                 logger.debug(f"Set global litellm.api_base to {value}")
-
+            if hasattr(litellm, key):
+                setattr(litellm, key, value)
+                logger.debug(f"Set global litellm.{key}")
+            # Handle common aliases or expected config names if necessary
+            elif key == "api_base":  # Example: map api_base if needed
+                litellm.api_base = value
+                logger.debug(f"Set global litellm.api_base to {value}")
 
     def create_response(
         self,
         *,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         model: Optional[str] = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a chat completion response using litellm.
 
@@ -82,20 +84,25 @@ class LLMClient:
         """
         completion_model = model or self.default_model
         if not completion_model:
-            raise ValueError("No model specified for chat completion (neither default_model nor model argument).")
+            raise ValueError(
+                "No model specified for chat completion (neither default_model nor model argument)."
+            )
 
         # Prepare arguments directly from kwargs
         params = {
             "model": completion_model,
             "messages": messages,
-            **kwargs, # Pass through any extra arguments
+            **kwargs,  # Pass through any extra arguments
         }
         # Filter out None values only for keys explicitly present in kwargs to avoid sending nulls
         # unless they were intentionally provided as None.
-        filtered_params = {k: v for k, v in params.items() if v is not None or k in kwargs}
+        filtered_params = {
+            k: v for k, v in params.items() if v is not None or k in kwargs
+        }
 
-
-        logger.debug(f"Calling litellm.completion with model={completion_model} and params: {filtered_params}")
+        logger.debug(
+            f"Calling litellm.completion with model={completion_model} and params: {filtered_params}"
+        )
         try:
             # Use litellm's completion function
             if self.async_mode:

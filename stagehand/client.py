@@ -12,8 +12,8 @@ from .agent import Agent
 from .base import StagehandBase
 from .config import StagehandConfig
 from .context import StagehandContext
-from .page import StagehandPage
 from .llm import LLMClient
+from .page import StagehandPage
 from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
