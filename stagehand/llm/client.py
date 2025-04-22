@@ -35,6 +35,7 @@ class LLMClient:
                       See litellm documentation for available settings.
         """
         self.default_model = default_model
+        self.async_mode = async_mode
 
         # Caution: Setting litellm.api_key might affect other litellm usage.
         # Prefer environment variables for specific providers.
