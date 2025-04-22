@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 from ..base import StagehandBase
 from ..config import StagehandConfig
 from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
+from ..llm.client import LLMClient
 from .agent import SyncAgent
 from .context import SyncStagehandContext
 from .page import SyncStagehandPage
@@ -74,7 +75,12 @@ class Stagehand(StagehandBase):
         # self.context: Optional[SyncStagehandContext] = None
         self.agent = None
         self.model_client_options = model_client_options
-        self.streamed_response = True  # Default to True for streamed responses
+        self.streamed_response = True  # Default to True for streamed response
+        self.llm = LLMClient(
+            api_key=self.model_api_key,
+            default_model=self.model_name,
+            **self.model_client_options,
+        )
 
     def init(self):
         """

@@ -13,6 +13,7 @@ from .base import StagehandBase
 from .config import StagehandConfig
 from .context import StagehandContext
 from .page import StagehandPage
+from .llm import LLMClient
 from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
@@ -99,6 +100,13 @@ class Stagehand(StagehandBase):
         # Initialize the centralized logger with the specified verbosity
         self.logger = StagehandLogger(
             verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
+        )
+
+        # Instantiate the LLM client
+        self.llm = LLMClient(
+            api_key=self.model_api_key,
+            default_model=self.model_name,
+            **self.model_client_options,
         )
 
         self.httpx_client = httpx_client
