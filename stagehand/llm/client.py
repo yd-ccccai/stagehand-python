@@ -17,7 +17,6 @@ class LLMClient:
         self,
         api_key: Optional[str] = None,
         default_model: Optional[str] = None,
-        async_mode: bool = False,
         **kwargs: Any,  # To catch other potential litellm global settings
     ):
         """
@@ -31,15 +30,12 @@ class LLMClient:
                      not be desired if using multiple providers.
             default_model: The default model to use if none is specified in chat_completion
                            (e.g., "gpt-4o", "claude-3-opus-20240229").
-            async_mode: Whether to use async mode for the completion.
             **kwargs: Additional global settings for litellm (e.g., api_base).
                       See litellm documentation for available settings.
         """
         self.default_model = default_model
-        self.async_mode = async_mode
 
-        # Caution: Setting litellm.api_key might affect other litellm usage.
-        # Prefer environment variables for specific providers.
+        # Warning:Prefer environment variables for specific providers.
         if api_key:
             litellm.api_key = api_key
             logger.warning(
@@ -105,10 +101,7 @@ class LLMClient:
         )
         try:
             # Use litellm's completion function
-            if self.async_mode:
-                response = litellm.acompletion(**filtered_params)
-            else:
-                response = litellm.completion(**filtered_params)
+            response = litellm.completion(**filtered_params)
             return response
 
         except Exception as e:
