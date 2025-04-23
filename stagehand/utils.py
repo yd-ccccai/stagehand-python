@@ -356,6 +356,36 @@ class StagehandLogger:
         # Skip logging if below current verbosity level
         if level > self.verbose and level != 0:  # Always log errors (level 0)
             return
+        
+        # Call external logger if provided (handle async function)
+        if self.external_logger and self.external_logger is not default_log_handler:
+            # Format log data similar to TS LogLine structure
+            log_data = {
+                "message": {"message": message, "level": level},
+                "timestamp": datetime.now().isoformat(),
+            }
+            if category:
+                log_data["category"] = category
+            if auxiliary:
+                log_data["auxiliary"] = auxiliary
+
+            # Handle async callback properly
+            if asyncio.iscoroutinefunction(self.external_logger):
+                # Create a task but don't wait for it - this avoids blocking
+                # Must be called from an async context
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.create_task(self.external_logger(log_data))
+                    else:
+                        self.external_logger(log_data)
+                except RuntimeError:
+                    # No event loop running, log a warning
+                    self.external_logger(log_data)
+            else:
+                # Synchronous callback, just call directly
+                self.external_logger(log_data)
+            return
 
         # Get level style
         level_style = self.level_style.get(level, "info")
@@ -510,41 +540,6 @@ class StagehandLogger:
                 logger.warning(log_message)
             elif level == 3:
                 logger.debug(log_message)
-
-        # Call external logger if provided (handle async function)
-        if self.external_logger:
-            # Format log data similar to TS LogLine structure
-            log_data = {
-                "message": formatted_message,
-                "level": level,
-                "timestamp": datetime.now().isoformat(),
-            }
-            if category:
-                log_data["category"] = category
-            if auxiliary:
-                log_data["auxiliary"] = auxiliary
-
-            # Handle async callback properly
-            if asyncio.iscoroutinefunction(self.external_logger):
-                # Create a task but don't wait for it - this avoids blocking
-                # Must be called from an async context
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        asyncio.create_task(self.external_logger(log_data))
-                    else:
-                        # We're not in an async context, log a warning
-                        logger.warning(
-                            "Async external logger provided but not in async context - skipping callback"
-                        )
-                except RuntimeError:
-                    # No event loop running, log a warning
-                    logger.warning(
-                        "Async external logger provided but no event loop running - skipping callback"
-                    )
-            else:
-                # Synchronous callback, just call directly
-                self.external_logger(log_data)
 
     # Convenience methods
     def error(
