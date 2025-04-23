@@ -6,4 +6,4 @@ playwright>=1.42.1
 requests>=2.31.0
 rich
 browserbase
-litellm
+litellm==1.67.1
