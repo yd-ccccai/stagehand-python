@@ -8,7 +8,12 @@ from playwright.sync_api import sync_playwright
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
-from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
+from ..schemas import AgentConfig
+from ..utils import (
+    StagehandLogger,
+    convert_dict_keys_to_camel_case,
+    default_log_handler,
+)
 from .agent import SyncAgent
 from .context import SyncStagehandContext
 from .page import SyncStagehandPage
@@ -29,7 +34,7 @@ class Stagehand(StagehandBase):
         browserbase_api_key: Optional[str] = None,
         browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[dict[str, Any]], Any]] = sync_log_handler,
+        on_log: Optional[Callable[[dict[str, Any]], Any]] = default_log_handler,
         verbose: int = 1,
         model_name: Optional[str] = None,
         dom_settle_timeout_ms: Optional[int] = None,
@@ -48,7 +53,7 @@ class Stagehand(StagehandBase):
             browserbase_api_key=browserbase_api_key,
             browserbase_project_id=browserbase_project_id,
             model_api_key=model_api_key,
-            on_log=on_log,
+            on_log=None,
             verbose=verbose,
             model_name=model_name,
             dom_settle_timeout_ms=dom_settle_timeout_ms,
@@ -72,9 +77,30 @@ class Stagehand(StagehandBase):
         self._playwright_page = None
         self.page: Optional[SyncStagehandPage] = None
         # self.context: Optional[SyncStagehandContext] = None
-        self.agent = None
         self.model_client_options = model_client_options
         self.streamed_response = True  # Default to True for streamed responses
+
+        self._initialized = False
+        self._closed = False
+
+        if self.session_id:
+            if not self.browserbase_api_key:
+                raise ValueError(
+                    "browserbase_api_key is required (or set BROWSERBASE_API_KEY in env)."
+                )
+            if not self.browserbase_project_id:
+                raise ValueError(
+                    "browserbase_project_id is required (or set BROWSERBASE_PROJECT_ID in env)."
+                )
+
+    def __enter__(self):
+        self.logger.debug("Entering StagehandSync context manager (__enter__)...")
+        self.init()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.logger.debug("Exiting StagehandSync context manager (__exit__)...")
+        self.close()
 
     def init(self):
         """
@@ -135,11 +161,27 @@ class Stagehand(StagehandBase):
             self.page = self.stagehand_context.new_page()
             self._playwright_page = self.page.page
 
-        # Initialize agent
-        self.logger.debug("Initializing SyncAgent")
-        self.agent = SyncAgent(self)
-
         self._initialized = True
+
+    def agent(self, agent_config: AgentConfig) -> SyncAgent:
+        """
+        Create a synchronous agent instance configured with the provided options.
+
+        Args:
+            agent_config (AgentConfig): Configuration for the agent instance.
+                                          Provider must be specified or inferrable from the model.
+
+        Returns:
+            AgentSync: A configured synchronous Agent instance ready to execute tasks.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "StagehandSync must be initialized with init() before creating an agent."
+            )
+
+        self.logger.debug(f"Creating Agent instance with config: {agent_config}")
+        # Pass the required config directly to the Agent constructor
+        return SyncAgent(self, agent_config=agent_config)
 
     def close(self):
         """
@@ -233,76 +275,6 @@ class Stagehand(StagehandBase):
             raise RuntimeError(f"Invalid response format: {resp.text}")
         self.session_id = data["data"]["sessionId"]
 
-    def _handle_log(self, log_data: dict[str, Any]):
-        """
-        Handle a log message from the server.
-        First attempts to use the on_log callback, then falls back to formatting the log locally.
-        """
-        try:
-            # Call user-provided callback with original data if available
-            if self.on_log:
-                self.on_log(log_data)
-                return  # Early return after on_log to prevent double logging
-
-            # Extract message, category, and level info
-            message = log_data.get("message", "")
-            category = log_data.get("category", "")
-            level_str = log_data.get("level", "info")
-            auxiliary = log_data.get("auxiliary", {})
-
-            # Map level strings to internal levels
-            level_map = {
-                "debug": 3,
-                "info": 1,
-                "warning": 2,
-                "error": 0,
-            }
-
-            # Convert string level to int if needed
-            if isinstance(level_str, str):
-                internal_level = level_map.get(level_str.lower(), 1)
-            else:
-                internal_level = min(level_str, 3)  # Ensure level is between 0-3
-
-            # Handle the case where message itself might be a JSON-like object
-            if isinstance(message, dict):
-                # If message is a dict, just pass it directly to the logger
-                formatted_message = message
-            elif isinstance(message, str) and (
-                message.startswith("{") and ":" in message
-            ):
-                # If message looks like JSON but isn't a dict yet, it will be handled by _format_fastify_log
-                formatted_message = message
-            else:
-                # Regular message
-                formatted_message = message
-
-            # Log using the structured logger
-            self.logger.log(
-                formatted_message,
-                level=internal_level,
-                category=category,
-                auxiliary=auxiliary,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Error processing log message: {str(e)}")
-
-    def _log(
-        self, message: str, level: int = 1, category: str = None, auxiliary: dict = None
-    ):
-        """
-        Enhanced logging method that uses the StagehandLogger.
-
-        Args:
-            message: The message to log
-            level: Verbosity level (0=error, 1=info, 2=detailed, 3=debug)
-            category: Optional category for the message
-            auxiliary: Optional auxiliary data to include
-        """
-        # Use the structured logger
-        self.logger.log(message, level=level, category=category, auxiliary=auxiliary)
-
     def _execute(self, method: str, payload: dict[str, Any]) -> Any:
         """
         Execute a command synchronously.
@@ -312,17 +284,13 @@ class Stagehand(StagehandBase):
             "x-bb-project-id": self.browserbase_project_id,
             "Content-Type": "application/json",
             "Connection": "keep-alive",
-            "x-stream-response": str(self.streamed_response).lower(),
+            "x-stream-response": "true",
         }
         if self.model_api_key:
             headers["x-model-api-key"] = self.model_api_key
 
-        modified_payload = dict(payload)
-        if self.model_client_options and "modelClientOptions" not in modified_payload:
-            modified_payload["modelClientOptions"] = self.model_client_options
-
         # Convert snake_case keys to camelCase for the API
-        modified_payload = convert_dict_keys_to_camel_case(modified_payload)
+        modified_payload = convert_dict_keys_to_camel_case(payload)
 
         url = f"{self.server_url}/sessions/{self.session_id}/{method}"
         self.logger.debug(f"\n==== EXECUTING {method.upper()} ====")
@@ -396,5 +364,74 @@ class Stagehand(StagehandBase):
             self.logger.error(f"[EXCEPTION] {str(e)}")
             raise
 
-        self.logger.debug("Stream completed without 'finished' message")
         return result
+
+    def _handle_log(self, log_data: dict[str, Any]):
+        """
+        Handle a log message from the server.
+        First attempts to use the on_log callback, then falls back to formatting the log locally.
+        """
+        try:
+            # Call user-provided callback with original data if available
+            if self.on_log:
+                self.on_log(log_data)
+                return  # Early return after on_log to prevent double logging
+
+            # Extract message, category, and level info
+            message = log_data.get("message", "")
+            category = log_data.get("category", "")
+            level_str = log_data.get("level", "info")
+            auxiliary = log_data.get("auxiliary", {})
+
+            # Map level strings to internal levels
+            level_map = {
+                "debug": 3,
+                "info": 1,
+                "warning": 2,
+                "error": 0,
+            }
+
+            # Convert string level to int if needed
+            if isinstance(level_str, str):
+                internal_level = level_map.get(level_str.lower(), 1)
+            else:
+                internal_level = min(level_str, 3)  # Ensure level is between 0-3
+
+            # Handle the case where message itself might be a JSON-like object
+            if isinstance(message, dict):
+                # If message is a dict, just pass it directly to the logger
+                formatted_message = message
+            elif isinstance(message, str) and (
+                message.startswith("{") and ":" in message
+            ):
+                # If message looks like JSON but isn't a dict yet, it will be handled by _format_fastify_log
+                formatted_message = message
+            else:
+                # Regular message
+                formatted_message = message
+
+            # Log using the structured logger
+            self.logger.log(
+                formatted_message,
+                level=internal_level,
+                category=category,
+                auxiliary=auxiliary,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error processing log message: {str(e)}")
+
+    def _log(
+        self, message: str, level: int = 1, category: str = None, auxiliary: dict = None
+    ):
+        """
+        Enhanced logging method that uses the StagehandLogger.
+
+        Args:
+            message: The message to log
+            level: Verbosity level (0=error, 1=info, 2=detailed, 3=debug)
+            category: Optional category for the message
+            auxiliary: Optional auxiliary data to include
+        """
+        # Use the structured logger
+        self.logger.log(message, level=level, category=category, auxiliary=auxiliary)
