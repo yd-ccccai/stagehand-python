@@ -356,7 +356,7 @@ class StagehandLogger:
         # Skip logging if below current verbosity level
         if level > self.verbose and level != 0:  # Always log errors (level 0)
             return
-        
+
         # Call external logger if provided (handle async function)
         if self.external_logger and self.external_logger is not default_log_handler:
             # Format log data similar to TS LogLine structure
