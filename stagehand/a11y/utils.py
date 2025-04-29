@@ -2,9 +2,11 @@ import asyncio
 import json
 import re
 import time
-from typing import Any, Callable, Optional, TypedDict, Union
+from typing import Any, Optional, TypedDict, Union
 
 from stagehand.page import StagehandPage
+
+from ..utils import StagehandLogger
 
 # --- Placeholder Type Definitions ---
 
@@ -51,25 +53,11 @@ class TreeResult(TypedDict):
     idToUrl: dict[str, str]
 
 
-class LogLineAuxiliaryItem(TypedDict):
-    value: Any
-    type: str
-
-
-class LogLine(TypedDict, total=False):
-    category: str
-    message: str
-    level: int
-    auxiliary: Optional[dict[str, LogLineAuxiliaryItem]]
-
-
 # Placeholder for Playwright Page/CDPSession/Locator if not using StagehandPage directly
 # from playwright.async_api import Page, CDPSession, Locator
 # Assuming types are imported if StagehandPage is not used directly
 CDPSession = Any  # Replace with actual Playwright CDPSession type if needed
 Locator = Any  # Replace with actual Playwright Locator type if needed
-
-LoggerCallable = Callable[[LogLine], None]
 
 
 # --- Placeholder Exceptions ---
@@ -100,8 +88,8 @@ def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
 
 async def _clean_structural_nodes(
     node: AccessibilityNode,
-    page: Optional[StagehandPage],  # Use StagehandPage placeholder
-    logger: Optional[LoggerCallable],
+    page: Optional[StagehandPage],
+    logger: Optional[StagehandLogger],
 ) -> Optional[AccessibilityNode]:
     """Helper function to remove or collapse unnecessary structural nodes."""
     # 1) Filter out nodes with negative IDs
@@ -159,34 +147,21 @@ async def _clean_structural_nodes(
                     )
                     result_value = tag_name_result.get("result", {}).get("value")
                     if result_value:
-                        node["role"] = result_value  # Update role in the dictionary
-                        node_role = result_value  # Update local variable too
+                        node["role"] = result_value
+                        node_role = result_value
                 except Exception as tag_name_error:
-                    logger(
-                        {
-                            "category": "observation",
-                            "message": (
-                                f"Could not fetch tagName for node {backend_node_id}"
-                            ),
-                            "level": 2,
-                            "auxiliary": {
-                                "error": {
-                                    "value": str(tag_name_error),
-                                    "type": "string",
-                                }
-                            },
-                        }
+                    # Use logger.warning (level 2)
+                    logger.warning(
+                        message=f"Could not fetch tagName for node {backend_node_id}",
+                        auxiliary={
+                            "error": {"value": str(tag_name_error), "type": "string"}
+                        },
                     )
         except Exception as resolve_error:
-            logger(
-                {
-                    "category": "observation",
-                    "message": f"Could not resolve DOM node ID {backend_node_id}",
-                    "level": 2,
-                    "auxiliary": {
-                        "error": {"value": str(resolve_error), "type": "string"}
-                    },
-                }
+            # Use logger.warning (level 2)
+            logger.warning(
+                message=f"Could not resolve DOM node ID {backend_node_id}",
+                auxiliary={"error": {"value": str(resolve_error), "type": "string"}},
             )
 
     # Remove redundant StaticText children
@@ -198,7 +173,6 @@ async def _clean_structural_nodes(
         return None if node_role in ("generic", "none") else {**node, "children": []}
 
     # 6) Return the updated node
-    # Create a new dictionary to avoid modifying the original node directly if needed elsewhere
     updated_node = {**node, "children": cleaned_children}
     return updated_node
 
@@ -219,9 +193,9 @@ def _extract_url_from_ax_node(
 
 
 async def build_hierarchical_tree(
-    nodes: list[AXNode],  # Input from CDP uses AXNode structure
+    nodes: list[AXNode],
     page: Optional[StagehandPage],
-    logger: Optional[LoggerCallable],
+    logger: Optional[StagehandLogger],
 ) -> TreeResult:
     """Builds a hierarchical tree structure from a flat array of accessibility nodes."""
     id_to_url: dict[str, str] = {}
@@ -234,7 +208,6 @@ async def build_hierarchical_tree(
         if not node_id or int(node_id) < 0:
             continue
 
-        # Assuming _extract_url_from_ax_node works with AXNode structure
         url = _extract_url_from_ax_node(node_data)
         if url:
             id_to_url[node_id] = url
@@ -249,7 +222,6 @@ async def build_hierarchical_tree(
         if not has_valid_name and not has_children and not is_interactive:
             continue
 
-        # Create AccessibilityNode structure for internal use
         processed_node: AccessibilityNode = {
             "nodeId": node_id,
             "role": role_value,
@@ -274,24 +246,21 @@ async def build_hierarchical_tree(
                 {"properties": node_data["properties"]}
                 if "properties" in node_data
                 else {}
-            ),  # Keep properties if needed later
-            # Add parentId and childIds for tree building phase
+            ),
             **({"parentId": node_data["parentId"]} if "parentId" in node_data else {}),
             **({"childIds": node_data["childIds"]} if "childIds" in node_data else {}),
         }
         node_map[node_id] = processed_node
 
     # Second pass: Establish parent-child relationships using childIds and node_map
-    all_nodes_in_map = list(node_map.values())  # Use the processed nodes
+    all_nodes_in_map = list(node_map.values())
     for node in all_nodes_in_map:
         node_id = node["nodeId"]
         parent_id = node.get("parentId")
 
         # Add iframes to list
         if node.get("role") == "Iframe":
-            iframe_list.append(
-                {"role": "Iframe", "nodeId": node_id}
-            )  # Store minimal info
+            iframe_list.append({"role": "Iframe", "nodeId": node_id})
 
         if parent_id and parent_id in node_map:
             parent_node = node_map[parent_id]
@@ -322,30 +291,17 @@ async def build_hierarchical_tree(
 
 
 async def get_accessibility_tree(
-    page: StagehandPage,  # Use StagehandPage placeholder
-    logger: LoggerCallable,
+    page: StagehandPage,
+    logger: StagehandLogger,
 ) -> TreeResult:
     """Retrieves the full accessibility tree via CDP and transforms it."""
-    # Playwright Python often doesn't require explicit domain enabling/disabling
-    # await page.enableCDP("Accessibility") # Might not be needed
-
     try:
         start_time = time.time()
-        # Identify scrollable elements
-        scrollable_backend_ids = await find_scrollable_element_ids(
-            page
-        )  # Use StagehandPage
-
-        # Fetch the full accessibility tree using CDP via StagehandPage
-        # Ensure send_cdp is correctly implemented in StagehandPage
+        scrollable_backend_ids = await find_scrollable_element_ids(page)
         cdp_result = await page.send_cdp("Accessibility.getFullAXTree")
-        nodes: list[AXNode] = cdp_result.get("nodes", [])  # Type hint for clarity
-
+        nodes: list[AXNode] = cdp_result.get("nodes", [])
         processing_start_time = time.time()
 
-        # Map AXNode structure from CDP to internal AccessibilityNode-like structure
-        # before passing to build_hierarchical_tree if needed, or adjust build_hierarchical_tree
-        # The current build_hierarchical_tree expects AXNode list directly
         for node_data in nodes:
             backend_id = node_data.get("backendDOMNodeId")
             role_value_obj = node_data.get("role")
@@ -368,34 +324,24 @@ async def get_accessibility_tree(
         hierarchical_tree = await build_hierarchical_tree(nodes, page, logger)
 
         end_time = time.time()
-        logger(
-            {
-                "category": "observation",
-                "message": (
-                    f"got accessibility tree in {int((end_time - start_time) * 1000)}ms "
-                    f"(processing: {int((end_time - processing_start_time) * 1000)}ms)"
-                ),
-                "level": 1,
-            }
+        # Use logger.info (level 1)
+        logger.info(
+            message=(
+                f"got accessibility tree in {int((end_time - start_time) * 1000)}ms "
+                f"(processing: {int((end_time - processing_start_time) * 1000)}ms)"
+            ),
         )
         return hierarchical_tree
 
     except Exception as error:
-        logger(
-            {
-                "category": "observation",
-                "message": "Error getting accessibility tree",
-                "level": 1,
-                "auxiliary": {
-                    "error": {"value": str(error), "type": "string"},
-                    # Python doesn't have a direct error.stack equivalent, use traceback
-                    # "trace": {"value": traceback.format_exc(), "type": "string"},
-                },
-            }
+        # Use logger.error (level 0)
+        logger.error(
+            message="Error getting accessibility tree",
+            auxiliary={"error": {"value": str(error), "type": "string"}},
         )
         raise error
-    # finally:
-    # await page.disableCDP("Accessibility") # Might not be needed
+    finally:
+        await page.disable_cdp_domain("Accessibility")
 
 
 # JavaScript function to get XPath (remains JavaScript)
