@@ -17,6 +17,7 @@ from playwright.sync_api import Page as PlaywrightPage
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
+from ..llm.client import LLMClient
 from ..utils import StagehandLogger, convert_dict_keys_to_camel_case
 from .agent import SyncAgent
 from .context import SyncStagehandContext
@@ -126,6 +127,11 @@ class Stagehand(StagehandBase):
         self._closed = False
         self.streamed_response = (
             stream_response if stream_response is not None else True
+        )
+        self.llm = LLMClient(
+            api_key=self.model_api_key,
+            default_model=self.model_name,
+            **self.model_client_options,
         )
 
     def __enter__(self):
