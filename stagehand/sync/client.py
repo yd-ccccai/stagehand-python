@@ -1,15 +1,24 @@
 import json
 import logging
-from typing import Any, Callable, Optional
+import os
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Any, Callable, Literal, Optional
 
 import requests
 from browserbase import Browserbase
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import (
+    BrowserContext,
+    Playwright,
+    sync_playwright,
+)
+from playwright.sync_api import Page as PlaywrightPage
 
 from ..base import StagehandBase
 from ..config import StagehandConfig
 from ..llm.client import LLMClient
-from ..utils import StagehandLogger, convert_dict_keys_to_camel_case, sync_log_handler
+from ..utils import StagehandLogger, convert_dict_keys_to_camel_case
 from .agent import SyncAgent
 from .context import SyncStagehandContext
 from .page import SyncStagehandPage
@@ -30,7 +39,7 @@ class Stagehand(StagehandBase):
         browserbase_api_key: Optional[str] = None,
         browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[dict[str, Any]], Any]] = sync_log_handler,
+        on_log: Optional[Callable[[dict[str, Any]], Any]] = None,
         verbose: int = 1,
         model_name: Optional[str] = None,
         dom_settle_timeout_ms: Optional[int] = None,
@@ -41,6 +50,8 @@ class Stagehand(StagehandBase):
         wait_for_captcha_solves: Optional[bool] = None,
         system_prompt: Optional[str] = None,
         use_rich_logging: bool = True,
+        env: Literal["BROWSERBASE", "LOCAL"] = None,
+        local_browser_launch_options: Optional[dict[str, Any]] = None,
     ):
         super().__init__(
             config=config,
@@ -61,26 +72,76 @@ class Stagehand(StagehandBase):
             system_prompt=system_prompt,
         )
 
+        self.env = env.upper() if env else "BROWSERBASE"
+        self.local_browser_launch_options = local_browser_launch_options or {}
+        self._local_user_data_dir_temp: Optional[Path] = (
+            None  # To store path if created temporarily
+        )
+        self.timeout_settings = timeout_settings or 180.0  # requests timeout in seconds
+
+        # Validate env
+        if self.env not in ["BROWSERBASE", "LOCAL"]:
+            raise ValueError("env must be either 'BROWSERBASE' or 'LOCAL'")
+
+        # If using BROWSERBASE, session_id or creation params are needed
+        if self.env == "BROWSERBASE":
+            if not self.session_id:
+                # Check if BROWSERBASE keys are present for session creation
+                if not self.browserbase_api_key:
+                    raise ValueError(
+                        "browserbase_api_key is required for BROWSERBASE env when no session_id is provided (or set BROWSERBASE_API_KEY in env)."
+                    )
+                if not self.browserbase_project_id:
+                    raise ValueError(
+                        "browserbase_project_id is required for BROWSERBASE env when no session_id is provided (or set BROWSERBASE_PROJECT_ID in env)."
+                    )
+                # model_api_key check remains the same
+            elif self.session_id:
+                # Validate essential fields if session_id was provided for BROWSERBASE
+                if not self.browserbase_api_key:
+                    raise ValueError(
+                        "browserbase_api_key is required for BROWSERBASE env with existing session_id (or set BROWSERBASE_API_KEY in env)."
+                    )
+                if not self.browserbase_project_id:
+                    raise ValueError(
+                        "browserbase_project_id is required for BROWSERBASE env with existing session_id (or set BROWSERBASE_PROJECT_ID in env)."
+                    )
+
         # Initialize the centralized logger with the specified verbosity
         self.logger = StagehandLogger(
             verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
         )
 
         self._client: Optional[requests.Session] = None
-        self._playwright = None
+        self._playwright: Optional[Playwright] = None
         self._browser = None
-        self._context = None
-        self._playwright_page = None
+        self._context: Optional[BrowserContext] = None
+        self._playwright_page: Optional[PlaywrightPage] = None
         self.page: Optional[SyncStagehandPage] = None
-        # self.context: Optional[SyncStagehandContext] = None
         self.agent = None
-        self.model_client_options = model_client_options
-        self.streamed_response = True  # Default to True for streamed response
+        self.stagehand_context: Optional[SyncStagehandContext] = (
+            None  # Only used in BROWSERBASE? Needs review.
+        )
+
+        self._initialized = False
+        self._closed = False
+        self.streamed_response = (
+            stream_response if stream_response is not None else True
+        )
         self.llm = LLMClient(
             api_key=self.model_api_key,
             default_model=self.model_name,
             **self.model_client_options,
         )
+
+    def __enter__(self):
+        """Enter context manager."""
+        self.init()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
+        self.close()
 
     def init(self):
         """
@@ -91,57 +152,228 @@ class Stagehand(StagehandBase):
             return
 
         self.logger.debug("Initializing Stagehand...")
+        self.logger.debug(f"Environment: {self.env}")
 
-        if not self._client:
-            self._client = requests.Session()
-
-        # Create session if we don't have one
-        if not self.session_id:
-            self._create_session()
-            self.logger.debug(f"Created new session: {self.session_id}")
-
-        # Start Playwright and connect to remote
-        self.logger.debug("Starting Playwright...")
         self._playwright = sync_playwright().start()
 
-        bb = Browserbase(api_key=self.browserbase_api_key)
-        try:
-            session = bb.sessions.retrieve(self.session_id)
-            connect_url = session.connectUrl
-        except Exception as e:
-            self.logger.error(f"Error retrieving session: {str(e)}")
-            raise
-        connect_url = session.connectUrl
+        if self.env == "BROWSERBASE":
+            if not self._client:
+                self._client = requests.Session()  # Use requests.Session for sync
 
-        self.logger.debug(f"Connecting to remote browser at: {connect_url}")
-        self._browser = self._playwright.chromium.connect_over_cdp(connect_url)
-        self.logger.debug(f"Connected to remote browser: {self._browser}")
+            # Create session if we don't have one
+            if not self.session_id:
+                self._create_session()  # Uses self._client (requests)
+                self.logger.debug(
+                    f"Created new Browserbase session via Stagehand server: {self.session_id}"
+                )
+            else:
+                self.logger.debug(
+                    f"Using existing Browserbase session: {self.session_id}"
+                )
 
-        # Access or create a context
-        existing_contexts = self._browser.contexts
-        self.logger.debug(f"Existing contexts: {len(existing_contexts)}")
-        if existing_contexts:
-            self._context = existing_contexts[0]
+            bb = Browserbase(api_key=self.browserbase_api_key)
+            try:
+                session = bb.sessions.retrieve(self.session_id)
+                if session.status != "RUNNING":
+                    raise RuntimeError(
+                        f"Browserbase session {self.session_id} is not running (status: {session.status})"
+                    )
+                connect_url = session.connectUrl
+            except Exception as e:
+                self.logger.error(
+                    f"Error retrieving or validating Browserbase session: {str(e)}"
+                )
+                self.close()
+                raise
+
+            try:
+                self._browser = self._playwright.chromium.connect_over_cdp(connect_url)
+                self.logger.debug(f"Connected to remote browser: {self._browser}")
+            except Exception as e:
+                self.logger.error(f"Failed to connect via CDP: {str(e)}")
+                self.close()
+                raise
+
+            # Access or create a context (Sync)
+            existing_contexts = self._browser.contexts
+            self.logger.debug(
+                f"Existing contexts in remote browser: {len(existing_contexts)}"
+            )
+            if existing_contexts:
+                self._context = existing_contexts[0]
+            else:
+                self.logger.warning(
+                    "No existing context found in remote browser, creating a new one."
+                )
+                self._context = self._browser.new_context()  # Sync API
+
+            # Wrap the context with SyncStagehandContext
+            self.stagehand_context = SyncStagehandContext.init(self._context, self)
+
+            existing_pages = self._context.pages
+            self.logger.debug(f"Existing pages in context: {len(existing_pages)}")
+            if existing_pages:
+                self.logger.debug("Using existing page via StagehandContext")
+                self._playwright_page = existing_pages[0]
+                self.page = self.stagehand_context.get_stagehand_page(
+                    self._playwright_page
+                )
+            else:
+                self.logger.debug("Creating a new page via StagehandContext")
+                self.page = self.stagehand_context.new_page()
+                self._playwright_page = self.page.page
+
+        elif self.env == "LOCAL":
+            cdp_url = self.local_browser_launch_options.get("cdp_url")
+
+            if cdp_url:
+                self.logger.info(f"Connecting to local browser via CDP URL: {cdp_url}")
+                try:
+                    self._browser = self._playwright.chromium.connect_over_cdp(cdp_url)
+                    if not self._browser.contexts:
+                        raise RuntimeError(
+                            f"No browser contexts found at CDP URL: {cdp_url}"
+                        )
+                    self._context = self._browser.contexts[0]
+                    self.logger.debug(
+                        f"Connected via CDP. Using context: {self._context}"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to connect via CDP URL ({cdp_url}): {str(e)}"
+                    )
+                    self.close()
+                    raise
+            else:
+                # Launch a new persistent local context (Sync)
+                self.logger.info("Launching new local browser context (sync)...")
+
+                # 1. Determine User Data Directory (same logic as async)
+                user_data_dir_option = self.local_browser_launch_options.get(
+                    "user_data_dir"
+                )
+                if user_data_dir_option:
+                    user_data_dir = Path(user_data_dir_option).resolve()
+                    self.logger.debug(f"Using provided user_data_dir: {user_data_dir}")
+                else:
+                    temp_dir = tempfile.mkdtemp(prefix="stagehand_sync_ctx_")
+                    self._local_user_data_dir_temp = Path(temp_dir)
+                    user_data_dir = self._local_user_data_dir_temp
+                    default_profile_path = user_data_dir / "Default"
+                    default_profile_path.mkdir(parents=True, exist_ok=True)
+                    prefs_path = default_profile_path / "Preferences"
+                    default_prefs = {"plugins": {"always_open_pdf_externally": True}}
+                    try:
+                        with open(prefs_path, "w") as f:
+                            json.dump(default_prefs, f)
+                        self.logger.debug(
+                            f"Created temporary user_data_dir with default preferences: {user_data_dir}"
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to write default preferences to {prefs_path}: {e}"
+                        )
+
+                # 2. Determine Downloads Path (same logic as async)
+                downloads_path_option = self.local_browser_launch_options.get(
+                    "downloads_path"
+                )
+                if downloads_path_option:
+                    downloads_path = str(Path(downloads_path_option).resolve())
+                else:
+                    downloads_path = str(Path.cwd() / "downloads")
+                try:
+                    os.makedirs(downloads_path, exist_ok=True)
+                    self.logger.debug(f"Using downloads_path: {downloads_path}")
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to create downloads_path {downloads_path}: {e}"
+                    )
+
+                # 3. Prepare Launch Options (same logic as async)
+                launch_options = {
+                    "headless": self.local_browser_launch_options.get(
+                        "headless", False
+                    ),
+                    "accept_downloads": self.local_browser_launch_options.get(
+                        "acceptDownloads", True
+                    ),
+                    "downloads_path": downloads_path,
+                    "args": self.local_browser_launch_options.get(
+                        "args",
+                        [
+                            "--enable-webgl",
+                            "--use-gl=swiftshader",
+                            "--enable-accelerated-2d-canvas",
+                            "--disable-blink-features=AutomationControlled",
+                            "--disable-web-security",
+                        ],
+                    ),
+                    "viewport": self.local_browser_launch_options.get(
+                        "viewport", {"width": 1024, "height": 768}
+                    ),
+                    "locale": self.local_browser_launch_options.get("locale", "en-US"),
+                    "timezone_id": self.local_browser_launch_options.get(
+                        "timezoneId", "America/New_York"
+                    ),
+                    "bypass_csp": self.local_browser_launch_options.get(
+                        "bypassCSP", True
+                    ),
+                    "proxy": self.local_browser_launch_options.get("proxy"),
+                    "ignore_https_errors": self.local_browser_launch_options.get(
+                        "ignoreHTTPSErrors", True
+                    ),
+                }
+                launch_options = {
+                    k: v for k, v in launch_options.items() if v is not None
+                }
+
+                # 4. Launch Context (Sync)
+                try:
+                    # Use sync playwright API
+                    self._context = self._playwright.chromium.launch_persistent_context(
+                        str(user_data_dir), **launch_options
+                    )
+                    self.logger.info(
+                        "Local browser context launched successfully (sync)."
+                    )
+                    self._browser = self._context
+
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to launch local browser context (sync): {str(e)}"
+                    )
+                    self.close()
+                    raise
+
+                # 5. Add Cookies (Sync)
+                cookies = self.local_browser_launch_options.get("cookies")
+                if cookies:
+                    try:
+                        self._context.add_cookies(cookies)  # Sync API
+                        self.logger.debug(
+                            f"Added {len(cookies)} cookies to the context."
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to add cookies: {e}")
+
+            # Apply stealth scripts (Sync)
+            self._apply_stealth_scripts(self._context)
+
+            # Get the initial page (Sync)
+            if self._context.pages:
+                self._playwright_page = self._context.pages[0]
+                self.logger.debug("Using initial page from local context.")
+            else:
+                self.logger.debug("No initial page found, creating a new one.")
+                self._playwright_page = self._context.new_page()  # Sync API
+
+            self.page = SyncStagehandPage(self._playwright_page, self)
+
         else:
-            self.logger.debug("Creating a new context...")
-            self._context = self._browser.new_context()
+            raise RuntimeError(f"Invalid env value: {self.env}")
 
-        # Wrap the context with StagehandContext to ensure custom script injection
-        self.stagehand_context = SyncStagehandContext.init(self._context, self)
-
-        # Use context to get or create a page
-        existing_pages = self._context.pages
-        self.logger.debug(f"Existing pages: {len(existing_pages)}")
-        if existing_pages:
-            self.logger.debug("Using existing page via StagehandContext")
-            self._playwright_page = existing_pages[0]
-            self.page = self.stagehand_context.get_stagehand_page(self._playwright_page)
-        else:
-            self.logger.debug("Creating a new page via StagehandContext")
-            self.page = self.stagehand_context.new_page()
-            self._playwright_page = self.page.page
-
-        # Initialize agent
+        # Initialize agent (Sync)
         self.logger.debug("Initializing SyncAgent")
         self.agent = SyncAgent(self)
 
@@ -156,24 +388,63 @@ class Stagehand(StagehandBase):
 
         self.logger.debug("Closing resources...")
 
-        # End the session on the server if we have a session ID
-        if self.session_id:
-            try:
-                self.logger.debug(f"Ending session {self.session_id} on the server...")
-                self._execute("end", {"sessionId": self.session_id})
-                self.logger.debug(f"Session {self.session_id} ended successfully")
-            except Exception as e:
-                self.logger.error(f"Error ending session: {str(e)}")
+        if self.env == "BROWSERBASE":
+            if self.session_id and self._client:
+                try:
+                    self.logger.debug(
+                        f"Attempting to end server session {self.session_id}..."
+                    )
+                    self._execute("end", {"sessionId": self.session_id})
+                    self.logger.debug(
+                        f"Server session {self.session_id} ended successfully"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Error ending server session {self.session_id}: {str(e)}"
+                    )
+            elif self.session_id:
+                self.logger.warning(
+                    "Cannot end server session: HTTP client not available."
+                )
+
+            # Close requests Session
+            if self._client:
+                self.logger.debug(
+                    "Closing the internal HTTP client (requests.Session)..."
+                )
+                self._client.close()
+                self._client = None
+
+        elif self.env == "LOCAL":
+            if self._context:
+                try:
+                    self.logger.debug("Closing local browser context (sync)...")
+                    self._context.close()
+                    self._context = None
+                    self._browser = None
+                except Exception as e:
+                    self.logger.error(f"Error closing local context: {str(e)}")
+
+            # Clean up temporary user data directory
+            if self._local_user_data_dir_temp:
+                try:
+                    self.logger.debug(
+                        f"Removing temporary user data directory: {self._local_user_data_dir_temp}"
+                    )
+                    shutil.rmtree(self._local_user_data_dir_temp)
+                    self._local_user_data_dir_temp = None
+                except Exception as e:
+                    self.logger.error(
+                        f"Error removing temporary directory {self._local_user_data_dir_temp}: {str(e)}"
+                    )
 
         if self._playwright:
-            self.logger.debug("Stopping Playwright...")
-            self._playwright.stop()
-            self._playwright = None
-
-        if self._client:
-            self.logger.debug("Closing the HTTP client...")
-            self._client.close()
-            self._client = None
+            try:
+                self.logger.debug("Stopping Playwright (sync)...")
+                self._playwright.stop()
+                self._playwright = None
+            except Exception as e:
+                self.logger.error(f"Error stopping Playwright: {str(e)}")
 
         self._closed = True
 
@@ -233,6 +504,7 @@ class Stagehand(StagehandBase):
         )
         if resp.status_code != 200:
             raise RuntimeError(f"Failed to create session: {resp.text}")
+
         data = resp.json()
         self.logger.debug(f"Session created: {data}")
         if not data.get("success") or "sessionId" not in data.get("data", {}):
@@ -313,6 +585,10 @@ class Stagehand(StagehandBase):
         """
         Execute a command synchronously.
         """
+        if self.env != "BROWSERBASE":
+            # This method should only be called in BROWSERBASE mode now
+            raise RuntimeError(f"_execute called in unexpected environment: {self.env}")
+
         headers = {
             "x-bb-api-key": self.browserbase_api_key,
             "x-bb-project-id": self.browserbase_project_id,
@@ -402,5 +678,35 @@ class Stagehand(StagehandBase):
             self.logger.error(f"[EXCEPTION] {str(e)}")
             raise
 
-        self.logger.debug("Stream completed without 'finished' message")
-        return result
+    def _apply_stealth_scripts(self, context: BrowserContext):
+        """Applies JavaScript init scripts synchronously."""
+        self.logger.debug("Applying stealth init scripts to the context (sync)...")
+        # The script itself is the same as async
+        stealth_script = """
+        (() => {
+            if (navigator.webdriver) { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); }
+            Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+            if (navigator.plugins instanceof PluginArray && navigator.plugins.length === 0) {
+                 Object.defineProperty(navigator, 'plugins', {
+                    get: () => Object.values({
+                        'plugin1': { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                        'plugin2': { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                        'plugin3': { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+                    }),
+                });
+            }
+            try { delete window.__playwright_run; delete window.navigator.__proto__.webdriver; } catch (e) {}
+            if (window.navigator && window.navigator.permissions) {
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => {
+                    if (parameters && parameters.name === 'notifications') { return Promise.resolve({ state: Notification.permission }); }
+                    return originalQuery.apply(window.navigator.permissions, [parameters]);
+                };
+            }
+        })();
+        """
+        try:
+            context.add_init_script(stealth_script)  # Sync API
+            self.logger.debug("Stealth init script added successfully (sync).")
+        except Exception as e:
+            self.logger.error(f"Failed to add stealth init script (sync): {str(e)}")
