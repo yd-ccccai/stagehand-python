@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from playwright.async_api import Page
+from playwright.async_api import CDPSession, Page
 
 from .schemas import (
     ActOptions,
@@ -16,6 +16,8 @@ _INJECTION_SCRIPT = None
 
 class StagehandPage:
     """Wrapper around Playwright Page that integrates with Stagehand server"""
+
+    _cdp_client: Optional[CDPSession] = None
 
     def __init__(self, page: Page, stagehand_client):
         """
@@ -217,6 +219,68 @@ class StagehandPage:
             result = await self._stagehand._execute("screenshot", payload)
 
         return result
+
+    # Method to get or initialize the persistent CDP client
+    async def get_cdp_client(self) -> CDPSession:
+        """Gets the persistent CDP client, initializing it if necessary."""
+        # Check only if the client is None, rely on send_cdp's exception handling for disconnections
+        if self._cdp_client is None:
+            try:
+                self._stagehand.logger.debug("Creating new persistent CDP session.")
+                self._cdp_client = await self.page.context.new_cdp_session(self.page)
+            except Exception as e:
+                self._stagehand.logger.error(f"Failed to create CDP session: {e}")
+                raise  # Re-raise the exception
+        return self._cdp_client
+
+    # Modified send_cdp to use the persistent client
+    async def send_cdp(self, method: str, params: Optional[dict] = None) -> dict:
+        """Sends a CDP command using the persistent session."""
+        client = await self.get_cdp_client()
+        try:
+            # Type assertion might be needed depending on playwright version/typing
+            result = await client.send(method, params or {})
+        except Exception as e:
+            self._stagehand.logger.error(f"CDP command '{method}' failed: {e}")
+            # Handle specific errors if needed (e.g., session closed)
+            if "Target closed" in str(e) or "Session closed" in str(e):
+                # Attempt to reset the client if the session closed unexpectedly
+                self._cdp_client = None
+                client = await self.get_cdp_client()  # Try creating a new one
+                result = await client.send(method, params or {})
+            else:
+                raise  # Re-raise other errors
+        return result
+
+    # Method to enable a specific CDP domain
+    async def enable_cdp_domain(self, domain: str):
+        """Enables a specific CDP domain."""
+        try:
+            await self.send_cdp(f"{domain}.enable")
+        except Exception as e:
+            self._stagehand.logger.warning(
+                f"Failed to enable CDP domain '{domain}': {e}"
+            )
+
+    # Method to disable a specific CDP domain
+    async def disable_cdp_domain(self, domain: str):
+        """Disables a specific CDP domain."""
+        try:
+            await self.send_cdp(f"{domain}.disable")
+        except Exception:
+            # Ignore errors during disable, often happens during cleanup
+            pass
+
+    # Method to detach the persistent CDP client
+    async def detach_cdp_client(self):
+        """Detaches the persistent CDP client if it exists."""
+        if self._cdp_client and self._cdp_client.is_connected():
+            try:
+                await self._cdp_client.detach()
+                self._cdp_client = None
+            except Exception as e:
+                self._stagehand.logger.warning(f"Error detaching CDP client: {e}")
+        self._cdp_client = None
 
     # Forward other Page methods to underlying Playwright page
     def __getattr__(self, name):

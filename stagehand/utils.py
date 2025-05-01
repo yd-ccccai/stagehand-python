@@ -11,6 +11,8 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.theme import Theme
 
+from stagehand.types.a11y import AccessibilityNode
+
 # Custom theme for Rich
 stagehand_theme = Theme(
     {
@@ -114,6 +116,11 @@ def configure_logging(
         logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 
+################################################################################
+#
+# StagehandLogger: move into it's own file
+#
+################################################################################
 class StagehandLogger:
     """
     Enhanced Python equivalent of the TypeScript StagehandLogger class.
@@ -356,7 +363,7 @@ class StagehandLogger:
         # Skip logging if below current verbosity level
         if level > self.verbose and level != 0:  # Always log errors (level 0)
             return
-        
+
         # Call external logger if provided (handle async function)
         if self.external_logger and self.external_logger is not default_log_handler:
             # Format log data similar to TS LogLine structure
@@ -668,4 +675,18 @@ def convert_dict_keys_to_camel_case(data: dict[str, Any]) -> dict[str, Any]:
         camel_key = snake_to_camel(key)
         result[camel_key] = value
 
+    return result
+
+
+def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
+    """Formats a node and its children into a simplified string representation."""
+    indent = "  " * level
+    name_part = f": {node.get('name')}" if node.get("name") else ""
+    result = f"{indent}[{node.get('nodeId')}] {node.get('role')}{name_part}\n"
+
+    children = node.get("children", [])
+    if children:
+        result += "".join(
+            format_simplified_tree(child, level + 1) for child in children
+        )
     return result

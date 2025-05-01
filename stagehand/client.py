@@ -17,7 +17,6 @@ from playwright.async_api import (
 )
 from playwright.async_api import Page as PlaywrightPage
 
-from .agent import Agent
 from .base import StagehandBase
 from .config import StagehandConfig
 from .context import StagehandContext
@@ -450,10 +449,6 @@ class Stagehand(StagehandBase):
             # Should not happen due to __init__ validation
             raise RuntimeError(f"Invalid env value: {self.env}")
 
-        # Initialize agent (common to both modes, but Agent might need env awareness)
-        self.logger.debug("Initializing Agent")
-        self.agent = Agent(self)
-
         self._initialized = True
 
     async def close(self):
@@ -558,7 +553,7 @@ class Stagehand(StagehandBase):
                         "height": 768,
                     },
                 },
-                "proxies": True
+                "proxies": True,
             },
         }
 
