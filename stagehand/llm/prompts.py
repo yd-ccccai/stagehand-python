@@ -47,10 +47,7 @@ You will be given:
     ).strip()
 
     tool_instructions = (
-        (
-            "ONLY print the content using the print_extracted_data tool provided.\n"
-            "ONLY print the content using the print_extracted_data tool provided."
-        ).strip()
+        ("ONLY print the content using the print_extracted_data tool provided.").strip()
         if is_using_print_extracted_data_tool
         else ""
     )
@@ -97,8 +94,7 @@ DOM: {dom_elements}"""
 
     if is_using_print_extracted_data_tool:
         content += (
-            "\n\nONLY print the content using the print_extracted_data tool provided.\n"
-            "ONLY print the content using the print_extracted_data tool provided."
+            "\n\nONLY print the content using the print_extracted_data tool provided."
         )
 
     return ChatMessage(role="user", content=content)
