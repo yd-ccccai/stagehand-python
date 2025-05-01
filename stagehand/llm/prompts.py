@@ -1,8 +1,6 @@
 import json
 from typing import Any, Literal, Optional, TypedDict, Union
 
-# Define detailed types for ChatMessage content, mirroring TypeScript structure
-
 
 class ChatMessageImageUrl(TypedDict):
     url: str
