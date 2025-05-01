@@ -13,6 +13,9 @@ from .a11y import (
     PlaywrightMethodNotSupportedError,
     TreeResult,
 )
+from .llm import (
+    ChatMessage,
+)
 
 __all__ = [
     "AXProperty",
@@ -24,4 +27,5 @@ __all__ = [
     "Locator",
     "PlaywrightCommandError",
     "PlaywrightMethodNotSupportedError",
+    "ChatMessage",
 ]
