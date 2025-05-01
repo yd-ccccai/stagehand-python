@@ -1,23 +1,22 @@
-import asyncio
 import json
 import re
 import time
 from typing import Optional, Union
 
-from stagehand.page import StagehandPage
-
-from ..types.a11y import (
+from stagehand.sync.page import SyncStagehandPage
+from stagehand.types.a11y import (
     AccessibilityNode,
     AXNode,
     CDPSession,
     TreeResult,
 )
-from ..utils import StagehandLogger, format_simplified_tree
+
+from ...utils import StagehandLogger, format_simplified_tree
 
 
-async def _clean_structural_nodes(
+def _clean_structural_nodes(
     node: AccessibilityNode,
-    page: Optional[StagehandPage],
+    page: Optional[SyncStagehandPage],
     logger: Optional[StagehandLogger],
 ) -> Optional[AccessibilityNode]:
     """Helper function to remove or collapse unnecessary structural nodes."""
@@ -32,11 +31,11 @@ async def _clean_structural_nodes(
         return None if node.get("role") in ("generic", "none") else node
 
     # 3) Recursively clean children
-    cleaned_children_tasks = [
-        _clean_structural_nodes(child, page, logger) for child in children
-    ]
-    resolved_children = await asyncio.gather(*cleaned_children_tasks)
-    cleaned_children = [child for child in resolved_children if child is not None]
+    cleaned_children = []
+    for child in children:
+        cleaned_child = _clean_structural_nodes(child, page, logger)
+        if cleaned_child:
+            cleaned_children.append(cleaned_child)
 
     # 4) Prune "generic" or "none" nodes first
     node_role = node.get("role")
@@ -58,7 +57,7 @@ async def _clean_structural_nodes(
         and node_role in ("generic", "none")
     ):
         try:
-            resolved_node = await page.send_cdp(
+            resolved_node = page.send_cdp(
                 "DOM.resolveNode", {"backendNodeId": backend_node_id}
             )
             object_info = resolved_node.get("object")
@@ -66,7 +65,7 @@ async def _clean_structural_nodes(
                 object_id = object_info["objectId"]
                 try:
                     function_declaration = 'function() { return this.tagName ? this.tagName.toLowerCase() : ""; }'
-                    tag_name_result = await page.send_cdp(
+                    tag_name_result = page.send_cdp(
                         "Runtime.callFunctionOn",
                         {
                             "objectId": object_id,
@@ -121,9 +120,9 @@ def _extract_url_from_ax_node(
     return None
 
 
-async def build_hierarchical_tree(
+def build_hierarchical_tree(
     nodes: list[AXNode],
-    page: Optional[StagehandPage],
+    page: Optional[SyncStagehandPage],
     logger: Optional[StagehandLogger],
 ) -> TreeResult:
     """Builds a hierarchical tree structure from a flat array of accessibility nodes."""
@@ -202,11 +201,11 @@ async def build_hierarchical_tree(
     # Final pass: Build root-level tree and clean up
     root_nodes = [node for node in node_map.values() if not node.get("parentId")]
 
-    cleaned_tree_tasks = [
-        _clean_structural_nodes(node, page, logger) for node in root_nodes
-    ]
-    final_tree_nullable = await asyncio.gather(*cleaned_tree_tasks)
-    final_tree = [node for node in final_tree_nullable if node is not None]
+    final_tree = []
+    for node in root_nodes:
+        cleaned_node = _clean_structural_nodes(node, page, logger)
+        if cleaned_node:
+            final_tree.append(cleaned_node)
 
     # Generate simplified string representation
     simplified_format = "\n".join(format_simplified_tree(node) for node in final_tree)
@@ -219,15 +218,15 @@ async def build_hierarchical_tree(
     }
 
 
-async def get_accessibility_tree(
-    page: StagehandPage,
+def get_accessibility_tree(
+    page: SyncStagehandPage,
     logger: StagehandLogger,
 ) -> TreeResult:
     """Retrieves the full accessibility tree via CDP and transforms it."""
     try:
         start_time = time.time()
-        scrollable_backend_ids = await find_scrollable_element_ids(page)
-        cdp_result = await page.send_cdp("Accessibility.getFullAXTree")
+        scrollable_backend_ids = find_scrollable_element_ids(page)
+        cdp_result = page.send_cdp("Accessibility.getFullAXTree")
         nodes: list[AXNode] = cdp_result.get("nodes", [])
         processing_start_time = time.time()
 
@@ -250,7 +249,7 @@ async def get_accessibility_tree(
                         "value": new_role,
                     }  # Create role if missing
 
-        hierarchical_tree = await build_hierarchical_tree(nodes, page, logger)
+        hierarchical_tree = build_hierarchical_tree(nodes, page, logger)
 
         end_time = time.time()
         # Use logger.info (level 1)
@@ -270,7 +269,7 @@ async def get_accessibility_tree(
         )
         raise error
     finally:
-        await page.disable_cdp_domain("Accessibility")
+        page.disable_cdp_domain("Accessibility")
 
 
 # JavaScript function to get XPath (remains JavaScript)
@@ -326,13 +325,13 @@ function getNodePath(el) {
 """
 
 
-async def get_xpath_by_resolved_object_id(
+def get_xpath_by_resolved_object_id(
     cdp_client: CDPSession,  # Use Playwright CDPSession
     resolved_object_id: str,
 ) -> str:
     """Gets the XPath of an element given its resolved CDP object ID."""
     try:
-        result = await cdp_client.send(
+        result = cdp_client.send(
             "Runtime.callFunctionOn",
             {
                 "objectId": resolved_object_id,
@@ -348,14 +347,12 @@ async def get_xpath_by_resolved_object_id(
         return ""
 
 
-async def find_scrollable_element_ids(stagehand_page: StagehandPage) -> set[int]:
+def find_scrollable_element_ids(stagehand_page: SyncStagehandPage) -> set[int]:
     """Identifies backendNodeIds of scrollable elements in the DOM."""
     # Ensure getScrollableElementXpaths is defined in the page context
     try:
-        await stagehand_page.ensure_injection()
-        xpaths = await stagehand_page.evaluate(
-            "() => window.getScrollableElementXpaths()"
-        )
+        stagehand_page.ensure_injection()
+        xpaths = stagehand_page.evaluate("() => window.getScrollableElementXpaths()")
         if not isinstance(xpaths, list):
             print("Warning: window.getScrollableElementXpaths() did not return a list.")
             xpaths = []
@@ -367,7 +364,7 @@ async def find_scrollable_element_ids(stagehand_page: StagehandPage) -> set[int]
     cdp_session = None
     try:
         # Create a single CDP session for efficiency
-        cdp_session = await stagehand_page.context.new_cdp_session(stagehand_page.page)
+        cdp_session = stagehand_page.context.new_cdp_session(stagehand_page.page)
 
         for xpath in xpaths:
             if not xpath or not isinstance(xpath, str):
@@ -375,7 +372,7 @@ async def find_scrollable_element_ids(stagehand_page: StagehandPage) -> set[int]
 
             try:
                 # Evaluate XPath to get objectId
-                eval_result = await cdp_session.send(
+                eval_result = cdp_session.send(
                     "Runtime.evaluate",
                     {
                         "expression": (
@@ -400,7 +397,7 @@ async def find_scrollable_element_ids(stagehand_page: StagehandPage) -> set[int]
                 if object_id:
                     try:
                         # Describe node to get backendNodeId
-                        node_info = await cdp_session.send(
+                        node_info = cdp_session.send(
                             "DOM.describeNode",
                             {
                                 "objectId": object_id,
@@ -424,7 +421,7 @@ async def find_scrollable_element_ids(stagehand_page: StagehandPage) -> set[int]
     finally:
         if cdp_session:
             try:
-                await cdp_session.detach()
+                cdp_session.detach()
             except Exception:
                 pass  # Ignore detach error
 

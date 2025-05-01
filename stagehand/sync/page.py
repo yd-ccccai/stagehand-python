@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from playwright.sync_api import Page
+from playwright.sync_api import CDPSession, Page
 
 from ..schemas import (
     ActOptions,
@@ -11,10 +11,14 @@ from ..schemas import (
     ObserveResult,
 )
 
+_INJECTION_SCRIPT = None
+
 
 class SyncStagehandPage:
     """Synchronous wrapper around Playwright Page that integrates with Stagehand
     server"""
+
+    _cdp_client: Optional[CDPSession] = None
 
     def __init__(self, page: Page, stagehand_client):
         """
@@ -27,6 +31,30 @@ class SyncStagehandPage:
         """
         self.page = page
         self._stagehand = stagehand_client
+
+    def ensure_injection(self):
+        """Ensure custom injection scripts are present on the page using domScripts.js."""
+        exists_before = self.page.evaluate(
+            "typeof window.getScrollableElementXpaths === 'function'"
+        )
+        if not exists_before:
+            global _INJECTION_SCRIPT
+            if _INJECTION_SCRIPT is None:
+                import os
+
+                script_path = os.path.join(
+                    os.path.dirname(__file__), "..", "domScripts.js"
+                )
+                try:
+                    with open(script_path) as f:
+                        _INJECTION_SCRIPT = f.read()
+                except Exception as e:
+                    self._stagehand.logger.error(f"Error reading domScripts.js: {e}")
+                    _INJECTION_SCRIPT = "/* fallback injection script */"
+            # Inject the script into the current page context
+            self.page.evaluate(_INJECTION_SCRIPT)
+            # Ensure that the script is injected on future navigations
+            self.page.add_init_script(_INJECTION_SCRIPT)
 
     def goto(
         self,
@@ -80,6 +108,7 @@ class SyncStagehandPage:
                 Returns:
                     ActResult: The result from the Stagehand server's action execution.
         """
+        self.ensure_injection()
         # Check if options is an ObserveResult with both selector and method
         if (
             isinstance(options, ObserveResult)
@@ -115,6 +144,7 @@ class SyncStagehandPage:
                     list[ObserveResult]: A list of observation results from the Stagehand
         server.
         """
+        self.ensure_injection()
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
             options = ObserveOptions(instruction=options)
@@ -142,6 +172,7 @@ class SyncStagehandPage:
         Returns:
             ExtractResult: The result from the Stagehand server's extraction execution.
         """
+        self.ensure_injection()
         # Allow for no options to extract the entire page
         if options is None:
             payload = {}
@@ -180,6 +211,67 @@ class SyncStagehandPage:
 
         return result
 
+    # Method to get or initialize the persistent CDP client
+    def get_cdp_client(self) -> CDPSession:
+        """Gets the persistent CDP client, initializing it if necessary."""
+        # Check only if the client is None, rely on send_cdp's exception handling for disconnections
+        if self._cdp_client is None:
+            try:
+                self._stagehand.logger.debug("Creating new persistent CDP session.")
+                self._cdp_client = self.page.context.new_cdp_session(self.page)
+            except Exception as e:
+                self._stagehand.logger.error(f"Failed to create CDP session: {e}")
+                raise  # Re-raise the exception
+        return self._cdp_client
+
+    # Modified send_cdp to use the persistent client
+    def send_cdp(self, method: str, params: Optional[dict] = None) -> dict:
+        """Sends a CDP command using the persistent session."""
+        client = self.get_cdp_client()
+        try:
+            result = client.send(method, params or {})
+        except Exception as e:
+            self._stagehand.logger.error(f"CDP command '{method}' failed: {e}")
+            # Handle specific errors if needed (e.g., session closed)
+            if "Target closed" in str(e) or "Session closed" in str(e):
+                # Attempt to reset the client if the session closed unexpectedly
+                self._cdp_client = None
+                client = self.get_cdp_client()  # Try creating a new one
+                result = client.send(method, params or {})
+            else:
+                raise  # Re-raise other errors
+        return result
+
+    # Method to enable a specific CDP domain
+    def enable_cdp_domain(self, domain: str):
+        """Enables a specific CDP domain."""
+        try:
+            self.send_cdp(f"{domain}.enable")
+        except Exception as e:
+            self._stagehand.logger.warning(
+                f"Failed to enable CDP domain '{domain}': {e}"
+            )
+
+    # Method to disable a specific CDP domain
+    def disable_cdp_domain(self, domain: str):
+        """Disables a specific CDP domain."""
+        try:
+            self.send_cdp(f"{domain}.disable")
+        except Exception:
+            # Ignore errors during disable, often happens during cleanup
+            pass
+
+    # Method to detach the persistent CDP client
+    def detach_cdp_client(self):
+        """Detaches the persistent CDP client if it exists."""
+        if self._cdp_client and self._cdp_client.is_connected():
+            try:
+                self._cdp_client.detach()
+                self._cdp_client = None
+            except Exception as e:
+                self._stagehand.logger.warning(f"Error detaching CDP client: {e}")
+        self._cdp_client = None
+
     # Forward other Page methods to underlying Playwright page
     def __getattr__(self, name):
         """
@@ -191,4 +283,5 @@ class SyncStagehandPage:
         Returns:
             The attribute from the underlying Playwright page.
         """
+        self._stagehand.logger.debug(f"Getting attribute: {name}")
         return getattr(self.page, name)
