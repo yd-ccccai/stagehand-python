@@ -449,10 +449,6 @@ class Stagehand(StagehandBase):
             # Should not happen due to __init__ validation
             raise RuntimeError(f"Invalid env value: {self.env}")
 
-        # Initialize agent (common to both modes, but Agent might need env awareness)
-        # self.logger.debug("Initializing Agent")
-        # self.agent = Agent(self)
-
         self._initialized = True
 
     async def close(self):
