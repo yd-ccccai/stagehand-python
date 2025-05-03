@@ -27,12 +27,12 @@ class StagehandPage:
             page (Page): The underlying Playwright page.
             stagehand_client: The client used to interface with the Stagehand server.
         """
-        self.page = page
+        self._page = page
         self._stagehand = stagehand_client
 
     async def ensure_injection(self):
         """Ensure custom injection scripts are present on the page using domScripts.js."""
-        exists_before = await self.page.evaluate(
+        exists_before = await self._page.evaluate(
             "typeof window.getScrollableElementXpaths === 'function'"
         )
         if not exists_before:
@@ -48,9 +48,9 @@ class StagehandPage:
                     self._stagehand.logger.error(f"Error reading domScripts.js: {e}")
                     _INJECTION_SCRIPT = "/* fallback injection script */"
             # Inject the script into the current page context
-            await self.page.evaluate(_INJECTION_SCRIPT)
+            await self._page.evaluate(_INJECTION_SCRIPT)
             # Ensure that the script is injected on future navigations
-            await self.page.add_init_script(_INJECTION_SCRIPT)
+            await self._page.add_init_script(_INJECTION_SCRIPT)
 
     async def goto(
         self,
@@ -72,6 +72,11 @@ class StagehandPage:
         Returns:
             The result from the Stagehand server's navigation execution.
         """
+        if self._stagehand.env == "LOCAL":
+            await self._page.goto(
+                url, referer=referer, timeout=timeout, wait_until=wait_until
+            )
+            return
         options = {}
         if referer is not None:
             options["referer"] = referer
@@ -108,6 +113,9 @@ class StagehandPage:
             ActResult: The result from the Stagehand server's action execution.
         """
         await self.ensure_injection()
+        if self._stagehand.env == "LOCAL":
+            self._stagehand.logger.warning("Local execution of act is not implemented")
+            return None
         # Check if options is an ObserveResult with both selector and method
         if (
             isinstance(options, ObserveResult)
@@ -145,6 +153,9 @@ class StagehandPage:
             list[ObserveResult]: A list of observation results from the Stagehand server.
         """
         await self.ensure_injection()
+        if self._stagehand.env == "LOCAL":
+            self._stagehand.logger.warning("Local execution of act is not implemented")
+            return []
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
             options = ObserveOptions(instruction=options)
@@ -178,6 +189,9 @@ class StagehandPage:
             ExtractResult: The result from the Stagehand server's extraction execution.
         """
         await self.ensure_injection()
+        if self._stagehand.env == "LOCAL":
+            self._stagehand.logger.warning("Local execution of act is not implemented")
+            return None
         # Allow for no options to extract the entire page
         if options is None:
             payload = {}
@@ -212,6 +226,11 @@ class StagehandPage:
         Returns:
             str: Base64-encoded screenshot data.
         """
+        if self._stagehand.env == "LOCAL":
+            self._stagehand.logger.warning(
+                "Local execution of screenshot is not implemented"
+            )
+            return None
         payload = options or {}
 
         lock = self._stagehand._get_lock_for_session()
@@ -227,7 +246,7 @@ class StagehandPage:
         if self._cdp_client is None:
             try:
                 self._stagehand.logger.debug("Creating new persistent CDP session.")
-                self._cdp_client = await self.page.context.new_cdp_session(self.page)
+                self._cdp_client = await self._page.context.new_cdp_session(self._page)
             except Exception as e:
                 self._stagehand.logger.error(f"Failed to create CDP session: {e}")
                 raise  # Re-raise the exception
@@ -293,5 +312,5 @@ class StagehandPage:
         Returns:
             The attribute from the underlying Playwright page.
         """
-        self._stagehand.logger.debug(f"Getting attribute: {name}")
-        return getattr(self.page, name)
+        # self._stagehand.logger.debug(f"Getting attribute: {name}")
+        return getattr(self._page, name)
