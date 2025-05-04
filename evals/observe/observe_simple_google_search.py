@@ -1,6 +1,7 @@
 import asyncio
 
 from evals.init_stagehand import init_stagehand
+from evals.utils import ensure_stagehand_config
 from stagehand.schemas import ObserveOptions
 from stagehand.utils import perform_playwright_method
 
@@ -24,6 +25,10 @@ async def observe_simple_google_search(model_name: str, logger) -> dict:
     """
     # Initialize Stagehand and extract URLs from the initialization response
     stagehand, init_response = await init_stagehand(model_name, logger)
+    
+    # Ensure stagehand has a config attribute
+    ensure_stagehand_config(stagehand)
+    
     debug_url = (
         init_response.get("debugUrl", {}).get("value")
         if isinstance(init_response.get("debugUrl"), dict)

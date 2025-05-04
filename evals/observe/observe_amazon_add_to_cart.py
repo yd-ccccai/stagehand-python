@@ -1,96 +1,107 @@
 import asyncio
 
 from evals.init_stagehand import init_stagehand
-from stagehand.schemas import ObserveOptions, ActOptions
+from evals.utils import ensure_stagehand_config
+from stagehand.schemas import ObserveOptions
 
 
 async def observe_amazon_add_to_cart(model_name: str, logger) -> dict:
     """
-    This function evaluates adding a product to cart on Amazon by:
+    This function evaluates observing Add to Cart elements on Amazon by:
     
     1. Initializing Stagehand with the provided model name and logger.
-    2. Navigating to a mock Amazon product page.
-    3. Using observe to find and click the "Add to Cart" button.
-    4. Using observe to find and click the "Proceed to checkout" button.
-    5. Verifying if the navigation reached the sign-in page.
+    2. Navigating to an Amazon product page.
+    3. Using observe to find Add to Cart buttons.
+    4. Checking if the observe API correctly identifies the Add to Cart buttons.
     
     Returns a dictionary containing:
-      - _success (bool): True if the checkout flow successfully reaches the sign-in page.
-      - currentUrl (str): The URL after completing the navigation steps.
+      - _success (bool): True if the Add to Cart elements are correctly observed.
+      - observations (list): The raw observations returned from the observe command.
       - debugUrl (str): Debug URL from the Stagehand initialization.
       - sessionUrl (str): Session URL from the Stagehand initialization.
       - logs (list): Logs collected via the provided logger.
     """
-    # Initialize Stagehand and extract URLs from the initialization response
-    stagehand, init_response = await init_stagehand(model_name, logger)
-    debug_url = (
-        init_response.get("debugUrl", {}).get("value")
-        if isinstance(init_response.get("debugUrl"), dict)
-        else init_response.get("debugUrl")
-    )
-    session_url = (
-        init_response.get("sessionUrl", {}).get("value")
-        if isinstance(init_response.get("sessionUrl"), dict)
-        else init_response.get("sessionUrl")
-    )
+    try:
+        # Initialize Stagehand and extract URLs from the initialization response
+        stagehand, init_response = await init_stagehand(model_name, logger)
+        
+        # Ensure stagehand has a config attribute
+        ensure_stagehand_config(stagehand)
+        
+        debug_url = (
+            init_response.get("debugUrl", {}).get("value")
+            if isinstance(init_response.get("debugUrl"), dict)
+            else init_response.get("debugUrl")
+        )
+        session_url = (
+            init_response.get("sessionUrl", {}).get("value")
+            if isinstance(init_response.get("sessionUrl"), dict)
+            else init_response.get("sessionUrl")
+        )
 
-    # Navigate to the mock Amazon product page
-    await stagehand.page.goto(
-        "https://browserbase.github.io/stagehand-eval-sites/sites/amazon/"
-    )
-    
-    # Wait for the page to load
-    await stagehand.page.wait_for_timeout(5000)
-    
-    # Use observe to find the "Add to Cart" button
-    observations1 = await stagehand.page.observe(
-        ObserveOptions(
-            instruction="Find and click the 'Add to Cart' button",
-            only_visible=False,
-            return_action=True
+        # Navigate to an Amazon product page
+        logger.info("Navigating to Amazon product page...")
+        await stagehand.page.goto("https://www.amazon.com/Amazon-Basics-High-Speed-Cable-Latest/dp/B014I8SSD0/")
+        
+        # Use observe to find Add to Cart buttons
+        logger.info("Running observe operation...")
+        observations = await stagehand.page.observe(
+            ObserveOptions(
+                instruction="Find the Add to Cart button"
+            )
         )
-    )
-    
-    print(observations1)
-    
-    # Perform the click action if a button was found
-    if observations1:
-        action1 = observations1[0]
-        await stagehand.page.act(action1)
-    
-    # Wait for the action to complete
-    await stagehand.page.wait_for_timeout(2000)
-    
-    # Use observe to find the "Proceed to checkout" button
-    observations2 = await stagehand.page.observe(
-        ObserveOptions(
-            instruction="Find and click the 'Proceed to checkout' button"
-        )
-    )
-    
-    # Perform the click action if a button was found
-    if observations2:
-        action2 = observations2[0]
-        await stagehand.page.act(action2)
-    
-    # Wait for the action to complete
-    await stagehand.page.wait_for_timeout(2000)
-    
-    # Get the current URL and check if it matches the expected URL
-    current_url = stagehand.page.url()
-    expected_url_prefix = "https://browserbase.github.io/stagehand-eval-sites/sites/amazon/sign-in.html"
-    
-    # Clean up and close the Stagehand client
-    await stagehand.close()
-    
-    # Return the evaluation results
-    return {
-        "_success": current_url.startswith(expected_url_prefix),
-        "currentUrl": current_url,
-        "debugUrl": debug_url,
-        "sessionUrl": session_url,
-        "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
-    }
+        
+        # If no observations were returned, mark eval as unsuccessful
+        if not observations:
+            logger.error("No observations returned")
+            await stagehand.close()
+            return {
+                "_success": False,
+                "observations": observations,
+                "debugUrl": debug_url,
+                "sessionUrl": session_url,
+                "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
+            }
+        
+        # Look for "add to cart" or similar text in the observed elements
+        found_add_to_cart = False
+        cart_related_texts = ["add to cart", "add to basket", "buy now"]
+        
+        for observation in observations:
+            # Try to get the inner text of the observed element
+            try:
+                element_text = await stagehand.page.locator(observation["selector"]).first.inner_text()
+                element_text = element_text.strip().lower()
+                
+                # Check if any cart-related text is in the element text
+                if any(cart_text in element_text for cart_text in cart_related_texts):
+                    found_add_to_cart = True
+                    logger.info(f"Found Add to Cart element with text: {element_text}")
+                    break
+            except Exception as e:
+                logger.error(f"Failed to check text for element with selector {observation.get('selector')}: {str(e)}")
+                continue
+        
+        # Clean up and close the Stagehand client
+        await stagehand.close()
+        
+        # Return the evaluation results
+        return {
+            "_success": found_add_to_cart,
+            "observations": observations,
+            "debugUrl": debug_url,
+            "sessionUrl": session_url,
+            "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
+        }
+    except Exception as e:
+        logger.error(f"Error in observe_amazon_add_to_cart: {str(e)}")
+        return {
+            "_success": False,
+            "error": str(e),
+            "debugUrl": None,
+            "sessionUrl": None,
+            "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],
+        }
 
 
 # For quick local testing

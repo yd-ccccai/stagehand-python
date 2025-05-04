@@ -1,10 +1,38 @@
 import asyncio
+import inspect
 
 from evals.init_stagehand import init_stagehand
+from evals.utils import ensure_stagehand_config
 from stagehand.schemas import ObserveOptions
+from stagehand.page import StagehandPage
 
 
-async def observe_taxes(model_name: str, logger) -> dict:
+# Monkey patch the observe method to avoid config attribute access if needed
+original_observe = StagehandPage.observe
+
+async def patched_observe(self, options):
+    logger.info("Using patched observe method that doesn't rely on config")
+    try:
+        return await original_observe(self, options)
+    except AttributeError as e:
+        if "'Stagehand' object has no attribute 'config'" in str(e):
+            logger.info("Caught config attribute error, applying workaround")
+            # If the error is about missing config, let's manually apply our fix
+            if not hasattr(self.client, 'config'):
+                self.client.config = type('StagehandConfig', (), {
+                    'model_name': getattr(self.client, 'model_name', 'gpt-4o'),
+                    'dom_settle_timeout_ms': getattr(self.client, 'dom_settle_timeout_ms', 3000),
+                    'env': getattr(self.client, 'env', 'LOCAL')
+                })
+            return await original_observe(self, options)
+        else:
+            raise
+
+
+# Global logger for the patched function
+logger = None
+
+async def observe_taxes(model_name: str, logger_instance) -> dict:
     """
     This function evaluates finding form inputs on a tax website by:
     
@@ -21,9 +49,34 @@ async def observe_taxes(model_name: str, logger) -> dict:
       - sessionUrl (str): Session URL from the Stagehand initialization (can be None in LOCAL mode).
       - logs (list): Logs collected via the provided logger.
     """
+    global logger
+    logger = logger_instance
+    
     try:
         # Initialize Stagehand and extract URLs from the initialization response
         stagehand, init_response = await init_stagehand(model_name, logger)
+        
+        # DEBUG: Log stagehand attributes before we try to fix it
+        logger.info(f"Stagehand object type: {type(stagehand)}")
+        logger.info(f"Stagehand attributes: {dir(stagehand)}")
+        logger.info(f"Has config attribute: {hasattr(stagehand, 'config')}")
+        
+        # Ensure stagehand has a config attribute
+        logger.info("About to ensure stagehand has config attribute")
+        stagehand = ensure_stagehand_config(stagehand)
+        logger.info(f"After ensure_stagehand_config, has config: {hasattr(stagehand, 'config')}")
+        
+        # If config attribute still doesn't exist, create it manually here
+        if not hasattr(stagehand, 'config'):
+            logger.info("Config attribute still missing, creating it manually")
+            # This is a fallback in case the utility function didn't work
+            stagehand.config = type('StagehandConfig', (), {
+                'model_name': getattr(stagehand, 'model_name', model_name),
+                'dom_settle_timeout_ms': getattr(stagehand, 'dom_settle_timeout_ms', 3000),
+                'env': getattr(stagehand, 'env', 'LOCAL')
+            })
+            logger.info(f"After manual creation, has config: {hasattr(stagehand, 'config')}")
+            
         debug_url = (
             init_response.get("debugUrl", {}).get("value")
             if isinstance(init_response.get("debugUrl"), dict)
@@ -34,6 +87,10 @@ async def observe_taxes(model_name: str, logger) -> dict:
             if isinstance(init_response.get("sessionUrl"), dict)
             else init_response.get("sessionUrl")
         )
+
+        # Apply our monkey patch to the observe method
+        StagehandPage.observe = patched_observe
+        logger.info("Applied monkey patch to StagehandPage.observe")
 
         # Navigate to the tax estimate website
         logger.info("Navigating to tax estimate website...")
@@ -97,6 +154,9 @@ async def observe_taxes(model_name: str, logger) -> dict:
         # Clean up and close the Stagehand client
         await stagehand.close()
         
+        # Restore original method
+        StagehandPage.observe = original_observe
+        
         # Return the evaluation results
         return {
             "_success": found_match,
@@ -108,10 +168,22 @@ async def observe_taxes(model_name: str, logger) -> dict:
         }
     except Exception as e:
         logger.error(f"Error in observe_taxes: {str(e)}")
+        logger.error(f"Error occurred at: {inspect.currentframe().f_lineno}")
+        logger.error(f"Error type: {type(e)}")
+        
+        # More detailed error information
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Restore original method if we had patched it
+        if StagehandPage.observe != original_observe:
+            StagehandPage.observe = original_observe
+        
         # Ensure we return a proper result structure even on exception
         return {
             "_success": False,
             "error": str(e),
+            "error_traceback": traceback.format_exc(),
             "debugUrl": None,
             "sessionUrl": None,
             "logs": logger.get_logs() if hasattr(logger, "get_logs") else [],

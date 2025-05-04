@@ -103,3 +103,45 @@ def compare_strings(a: str, b: str) -> float:
     This function uses difflib.SequenceMatcher to calculate the similarity between two strings.
     """
     return difflib.SequenceMatcher(None, a, b).ratio()
+
+def ensure_stagehand_config(stagehand):
+    """
+    Ensures the stagehand instance has a config attribute.
+    This is a workaround for an issue where stagehand created using the constructor directly
+    (not via StagehandConfig) doesn't have a config attribute.
+    
+    Args:
+        stagehand: The Stagehand instance to check/modify
+        
+    Returns:
+        The stagehand instance with guaranteed config attribute
+    """
+    print(f"DEBUG ensure_stagehand_config: Input type: {type(stagehand)}")
+    print(f"DEBUG ensure_stagehand_config: Input dir: {dir(stagehand)}")
+    print(f"DEBUG ensure_stagehand_config: Has config before: {hasattr(stagehand, 'config')}")
+    
+    try:
+        if not hasattr(stagehand, 'config'):
+            print("DEBUG ensure_stagehand_config: Creating config attribute")
+            
+            # Try to safely access attributes needed for config
+            model_name = getattr(stagehand, 'model_name', 'gpt-4o')  # Provide default if not found
+            dom_settle_timeout_ms = getattr(stagehand, 'dom_settle_timeout_ms', 3000)
+            env = getattr(stagehand, 'env', 'LOCAL')
+            
+            print(f"DEBUG ensure_stagehand_config: Using model_name={model_name}, dom_settle_timeout_ms={dom_settle_timeout_ms}, env={env}")
+            
+            # Create a simple config property with the necessary values from the stagehand object
+            stagehand.config = type('StagehandConfig', (), {
+                'model_name': model_name,
+                'dom_settle_timeout_ms': dom_settle_timeout_ms,
+                'env': env
+            })
+            
+            print(f"DEBUG ensure_stagehand_config: Verify creation - has config after: {hasattr(stagehand, 'config')}")
+    except Exception as e:
+        print(f"ERROR in ensure_stagehand_config: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+    
+    return stagehand
