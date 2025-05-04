@@ -119,9 +119,7 @@ class Stagehand(StagehandBase):
         self._playwright_page: Optional[PlaywrightPage] = None
         self.page: Optional[SyncStagehandPage] = None
         self.agent = None
-        self.stagehand_context: Optional[SyncStagehandContext] = (
-            None  # Only used in BROWSERBASE? Needs review.
-        )
+        self.context: Optional[SyncStagehandContext] = None
 
         self._initialized = False
         self._closed = False
@@ -208,19 +206,17 @@ class Stagehand(StagehandBase):
                 self._context = self._browser.new_context()  # Sync API
 
             # Wrap the context with SyncStagehandContext
-            self.stagehand_context = SyncStagehandContext.init(self._context, self)
+            self.context = SyncStagehandContext.init(self._context, self)
 
             existing_pages = self._context.pages
             self.logger.debug(f"Existing pages in context: {len(existing_pages)}")
             if existing_pages:
                 self.logger.debug("Using existing page via StagehandContext")
                 self._playwright_page = existing_pages[0]
-                self.page = self.stagehand_context.get_stagehand_page(
-                    self._playwright_page
-                )
+                self.page = self.context.get_stagehand_page(self._playwright_page)
             else:
                 self.logger.debug("Creating a new page via StagehandContext")
-                self.page = self.stagehand_context.new_page()
+                self.page = self.context.new_page()
                 self._playwright_page = self.page.page
 
         elif self.env == "LOCAL":
@@ -235,6 +231,7 @@ class Stagehand(StagehandBase):
                             f"No browser contexts found at CDP URL: {cdp_url}"
                         )
                     self._context = self._browser.contexts[0]
+                    self.context = SyncStagehandContext.init(self._context, self)
                     self.logger.debug(
                         f"Connected via CDP. Using context: {self._context}"
                     )
@@ -334,10 +331,11 @@ class Stagehand(StagehandBase):
                     self._context = self._playwright.chromium.launch_persistent_context(
                         str(user_data_dir), **launch_options
                     )
+                    self.context = SyncStagehandContext.init(self._context, self)
                     self.logger.info(
                         "Local browser context launched successfully (sync)."
                     )
-                    self._browser = self._context
+                    self._browser = self._context.browser
 
                 except Exception as e:
                     self.logger.error(

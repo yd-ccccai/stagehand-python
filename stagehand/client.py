@@ -174,7 +174,7 @@ class Stagehand(StagehandBase):
         self._playwright_page: Optional[PlaywrightPage] = None
         self.page: Optional[StagehandPage] = None
         self.agent = None
-        self.stagehand_context: Optional[StagehandContext] = None
+        self.context: Optional[StagehandContext] = None
 
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
@@ -276,20 +276,18 @@ class Stagehand(StagehandBase):
                     await self._browser.new_context()
                 )  # Should we pass options?
 
-            self.stagehand_context = await StagehandContext.init(self._context, self)
+            self.context = await StagehandContext.init(self._context, self)
 
             # Access or create a page via StagehandContext
             existing_pages = self._context.pages
             self.logger.debug(f"Existing pages in context: {len(existing_pages)}")
             if existing_pages:
                 self.logger.debug("Using existing page via StagehandContext")
-                self.page = await self.stagehand_context.get_stagehand_page(
-                    existing_pages[0]
-                )
+                self.page = await self.context.get_stagehand_page(existing_pages[0])
                 self._playwright_page = existing_pages[0]
             else:
                 self.logger.debug("Creating a new page via StagehandContext")
-                self.page = await self.stagehand_context.new_page()
+                self.page = await self.context.new_page()
                 self._playwright_page = self.page.page
 
         elif self.env == "LOCAL":
@@ -307,6 +305,7 @@ class Stagehand(StagehandBase):
                             f"No browser contexts found at CDP URL: {cdp_url}"
                         )
                     self._context = self._browser.contexts[0]
+                    self.context = await StagehandContext.init(self._context, self)
                     self.logger.debug(
                         f"Connected via CDP. Using context: {self._context}"
                     )
@@ -361,7 +360,6 @@ class Stagehand(StagehandBase):
                     )
 
                 # 3. Prepare Launch Options (translate keys if needed)
-                # Playwright Python uses snake_case, TS uses camelCase
                 launch_options = {
                     "headless": self.local_browser_launch_options.get(
                         "headless", False
@@ -396,9 +394,7 @@ class Stagehand(StagehandBase):
                     "ignore_https_errors": self.local_browser_launch_options.get(
                         "ignoreHTTPSErrors", True
                     ),
-                    # ... add others like permissions, geolocation, etc.
                 }
-                # Remove None values
                 launch_options = {
                     k: v for k, v in launch_options.items() if v is not None
                 }
@@ -411,10 +407,9 @@ class Stagehand(StagehandBase):
                             **launch_options,
                         )
                     )
+                    self.context = await StagehandContext.init(self._context, self)
                     self.logger.info("Local browser context launched successfully.")
-                    self._browser = (
-                        self._context
-                    )  # Assign context to _browser for consistency in close()
+                    self._browser = self._context.browser
 
                 except Exception as e:
                     self.logger.error(
@@ -496,7 +491,6 @@ class Stagehand(StagehandBase):
                 self._client = None
 
         elif self.env == "LOCAL":
-            # --- LOCAL Cleanup ---
             if self._context:
                 try:
                     self.logger.debug("Closing local browser context...")
