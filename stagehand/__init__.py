@@ -16,6 +16,8 @@ from .schemas import (
     ObserveResult,
 )
 from .utils import configure_logging
+from .handlers.observe_handler import ObserveHandler
+from .inference import observe
 
 __version__ = "0.3.5"
 
@@ -36,4 +38,6 @@ __all__ = [
     "AgentExecuteOptions",
     "AgentExecuteResult",
     "AgentProvider",
+    "ObserveHandler",
+    "observe",
 ]

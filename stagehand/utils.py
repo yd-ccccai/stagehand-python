@@ -690,3 +690,365 @@ def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
             format_simplified_tree(child, level + 1) for child in children
         )
     return result
+
+
+async def draw_observe_overlay(page, elements):
+    """
+    Draw an overlay on the page highlighting the observed elements.
+    
+    Args:
+        page: Playwright page object
+        elements: List of observation results with selectors
+    """
+    if not elements:
+        return
+        
+    # Create a function to inject and execute in the page context
+    script = """
+    (elements) => {
+        // First remove any existing overlays
+        document.querySelectorAll('.stagehand-observe-overlay').forEach(el => el.remove());
+        
+        // Create container for overlays
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.top = '0';
+        container.style.left = '0';
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.pointerEvents = 'none';
+        container.style.zIndex = '10000';
+        container.className = 'stagehand-observe-overlay';
+        document.body.appendChild(container);
+        
+        // Process each element
+        elements.forEach((element, index) => {
+            try {
+                // Parse the selector
+                let selector = element.selector;
+                if (selector.startsWith('xpath=')) {
+                    selector = selector.substring(6);
+                    
+                    // Evaluate the XPath to get the element
+                    const result = document.evaluate(
+                        selector, document, null, 
+                        XPathResult.FIRST_ORDERED_NODE_TYPE, null
+                    );
+                    
+                    if (result.singleNodeValue) {
+                        // Get the element's position
+                        const el = result.singleNodeValue;
+                        const rect = el.getBoundingClientRect();
+                        
+                        // Create the overlay
+                        const overlay = document.createElement('div');
+                        overlay.style.position = 'absolute';
+                        overlay.style.left = rect.left + 'px';
+                        overlay.style.top = rect.top + 'px';
+                        overlay.style.width = rect.width + 'px';
+                        overlay.style.height = rect.height + 'px';
+                        overlay.style.border = '2px solid red';
+                        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                        overlay.style.boxSizing = 'border-box';
+                        overlay.style.pointerEvents = 'none';
+                        
+                        // Add element ID
+                        const label = document.createElement('div');
+                        label.textContent = index + 1;
+                        label.style.position = 'absolute';
+                        label.style.left = '0';
+                        label.style.top = '-20px';
+                        label.style.backgroundColor = 'red';
+                        label.style.color = 'white';
+                        label.style.padding = '2px 5px';
+                        label.style.borderRadius = '3px';
+                        label.style.fontSize = '12px';
+                        
+                        overlay.appendChild(label);
+                        container.appendChild(overlay);
+                    }
+                } else {
+                    // Regular CSS selector
+                    const el = document.querySelector(selector);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        
+                        // Create the overlay (same as above)
+                        const overlay = document.createElement('div');
+                        overlay.style.position = 'absolute';
+                        overlay.style.left = rect.left + 'px';
+                        overlay.style.top = rect.top + 'px';
+                        overlay.style.width = rect.width + 'px';
+                        overlay.style.height = rect.height + 'px';
+                        overlay.style.border = '2px solid red';
+                        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                        overlay.style.boxSizing = 'border-box';
+                        overlay.style.pointerEvents = 'none';
+                        
+                        // Add element ID
+                        const label = document.createElement('div');
+                        label.textContent = index + 1;
+                        label.style.position = 'absolute';
+                        label.style.left = '0';
+                        label.style.top = '-20px';
+                        label.style.backgroundColor = 'red';
+                        label.style.color = 'white';
+                        label.style.padding = '2px 5px';
+                        label.style.borderRadius = '3px';
+                        label.style.fontSize = '12px';
+                        
+                        overlay.appendChild(label);
+                        container.appendChild(overlay);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error drawing overlay for element ${index}:`, error);
+            }
+        });
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.stagehand-observe-overlay').forEach(el => el.remove());
+        }, 5000);
+    }
+    """
+    
+    # Execute the script in the page context
+    await page.evaluate(script, elements)
+
+
+async def get_accessibility_tree(page, logger=None):
+    """
+    Get the accessibility tree from the page via CDP.
+    
+    Args:
+        page: StagehandPage instance
+        logger: Optional logger function
+        
+    Returns:
+        Dict containing the simplified and raw accessibility tree
+    """
+    try:
+        # Enable accessibility domain
+        await page.enable_cdp_domain("Accessibility")
+        
+        # Fetch the accessibility tree
+        result = await page.send_cdp("Accessibility.getFullAXTree")
+        
+        # Process the nodes to create a simplified text representation
+        simplified = await _simplify_accessibility_tree(page, result, logger)
+        
+        # Find iframe nodes
+        iframes = []
+        for node in result.get("nodes", []):
+            role = node.get("role", {}).get("value", "").lower()
+            if role == "iframe":
+                iframes.append(node)
+                
+        return {
+            "simplified": simplified,
+            "iframes": iframes,
+            "raw": result
+        }
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"Error getting accessibility tree: {e}")
+        return {
+            "simplified": "Error getting accessibility tree",
+            "iframes": [],
+            "raw": {}
+        }
+
+async def _simplify_accessibility_tree(page, tree_data, logger=None):
+    """
+    Convert the raw accessibility tree to a simplified text representation.
+    
+    Args:
+        page: StagehandPage instance
+        tree_data: Raw accessibility tree data
+        logger: Optional logger function
+        
+    Returns:
+        String containing simplified tree representation
+    """
+    nodes = tree_data.get("nodes", [])
+    if not nodes:
+        return "No accessibility nodes found"
+        
+    # Create a map of node IDs to nodes
+    node_map = {node.get("nodeId"): node for node in nodes}
+    
+    # Find the root node
+    root_nodes = [node for node in nodes if not node.get("parentId")]
+    if not root_nodes:
+        return "No root node found in accessibility tree"
+        
+    root_node = root_nodes[0]
+    
+    # Process the tree recursively
+    lines = []
+    await _process_node(root_node, node_map, lines, 0, page, logger)
+    
+    return "\n".join(lines)
+
+async def _process_node(node, node_map, lines, indent, page, logger=None):
+    """
+    Process a single node in the accessibility tree.
+    
+    Args:
+        node: The current node
+        node_map: Map of node IDs to nodes
+        lines: List to collect output lines
+        indent: Current indentation level
+        page: StagehandPage instance
+        logger: Optional logger function
+    """
+    try:
+        node_id = node.get("nodeId")
+        role = node.get("role", {}).get("value", "")
+        name = node.get("name", {}).get("value", "")
+        
+        # Get additional properties if available
+        properties = {}
+        for prop in node.get("properties", []):
+            prop_name = prop.get("name", {}).get("value", "")
+            prop_value = prop.get("value", {}).get("value", "")
+            if prop_name and prop_value:
+                properties[prop_name] = prop_value
+                
+        # Format node information
+        node_info = f"ID:{node_id} Role:{role}"
+        if name:
+            node_info += f" Name:{name}"
+            
+        # Add value if available
+        if "value" in properties:
+            node_info += f" Value:{properties['value']}"
+            
+        # Add checked state if available
+        if "checked" in properties:
+            node_info += f" Checked:{properties['checked']}"
+            
+        # Add clickable if available
+        if "clickable" in properties:
+            node_info += f" Clickable:{properties['clickable']}"
+            
+        # Add the line to the output
+        lines.append(f"{'  ' * indent}{node_info}")
+        
+        # Process child nodes
+        for child_id in node.get("childIds", []):
+            child_node = node_map.get(child_id)
+            if child_node:
+                await _process_node(child_node, node_map, lines, indent + 1, page, logger)
+                
+    except Exception as e:
+        if logger:
+            logger.error(f"Error processing accessibility node: {e}")
+        lines.append(f"{'  ' * indent}Error processing node: {str(e)}")
+
+async def get_xpath_by_object_id(cdp_client, object_id):
+    """
+    Get the XPath for an element by its object ID.
+    
+    Args:
+        cdp_client: CDP client
+        object_id: Element's object ID
+        
+    Returns:
+        XPath string for the element
+    """
+    result = await cdp_client.send(
+        "Runtime.callFunctionOn",
+        {
+            "functionDeclaration": """
+            function() {
+                function getXPath(node) {
+                    if (node.nodeType !== 1) return '';
+                    if (node.id) return `//*[@id="${node.id}"]`;
+                    
+                    const sameTypeCount = Array.from(node.parentNode.children)
+                        .filter(child => child.tagName === node.tagName)
+                        .indexOf(node) + 1;
+                    
+                    return `${getXPath(node.parentNode)}/${node.tagName.toLowerCase()}[${sameTypeCount}]`;
+                }
+                return getXPath(this);
+            }
+            """,
+            "objectId": object_id,
+            "returnByValue": True
+        }
+    )
+    
+    return result.get("result", {}).get("value", "")
+
+async def perform_playwright_method(page, logger, method, arguments, selector):
+    """
+    Perform a Playwright method on an element identified by selector.
+    
+    Args:
+        page: StagehandPage instance
+        logger: Logger instance
+        method: Method name to perform (e.g., "click", "fill")
+        arguments: List of arguments for the method
+        selector: Element selector (CSS or XPath)
+        
+    Returns:
+        Result of the method call
+    """
+    try:
+        # Determine if the selector is an XPath
+        is_xpath = selector.startswith("//") or selector.startswith("(//")
+        
+        # Get the Playwright locator
+        if is_xpath:
+            element = page.locator(f"xpath={selector}")
+        else:
+            element = page.locator(selector)
+        
+        # Log what we're doing
+        if logger:
+            logger.info(
+                f"Performing '{method}' on element with selector: {selector}",
+                extra={"arguments": arguments}
+            )
+        
+        # Call the appropriate method on the locator
+        if method == "click":
+            return await element.click()
+        elif method == "fill":
+            return await element.fill(arguments[0] if arguments else "")
+        elif method == "type":
+            return await element.type(arguments[0] if arguments else "")
+        elif method == "press":
+            return await element.press(arguments[0] if arguments else "")
+        elif method == "check":
+            return await element.check()
+        elif method == "uncheck":
+            return await element.uncheck()
+        elif method == "select_option":
+            return await element.select_option(arguments[0] if arguments else "")
+        elif method == "hover":
+            return await element.hover()
+        elif method == "focus":
+            return await element.focus()
+        elif method == "scroll_into_view":
+            return await element.scroll_into_view_if_needed()
+        else:
+            # Try to call the method directly if it exists
+            if hasattr(element, method.replace("_", "")):
+                func = getattr(element, method.replace("_", ""))
+                if callable(func):
+                    return await func(*arguments)
+            
+            # If we get here, the method is not supported
+            if logger:
+                logger.error(f"Unsupported method: {method}")
+            raise ValueError(f"Unsupported method: {method}")
+            
+    except Exception as e:
+        if logger:
+            logger.error(f"Error performing {method}: {e}")
+        raise

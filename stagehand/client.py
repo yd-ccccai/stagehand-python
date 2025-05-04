@@ -179,6 +179,11 @@ class Stagehand(StagehandBase):
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
 
+        # Setup LLM client if LOCAL mode
+        self.llm_client = None
+        if self.env == "LOCAL":
+            self._setup_llm_client()
+
     def _get_lock_for_session(self) -> asyncio.Lock:
         """
         Return an asyncio.Lock for this session. If one doesn't exist yet, create it.
@@ -813,3 +818,29 @@ class Stagehand(StagehandBase):
             self.logger.debug("Stealth init script added successfully.")
         except Exception as e:
             self.logger.error(f"Failed to add stealth init script: {str(e)}")
+
+    def _setup_llm_client(self):
+        """Set up the LLM client for local execution."""
+        model_name = self.config.model_name
+        api_key = self.config.model_client_options.get("apiKey")
+        
+        # Set up a simple LLM client object with the model name
+        self.llm_client = SimpleModelClient(model_name)
+        
+        # Configure LiteLLM with the API key if provided
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+        
+        self.logger.debug(f"Initialized LLM client with model: {model_name}")
+
+
+class SimpleModelClient:
+    """Simple class to hold model information for LiteLLM."""
+    
+    def __init__(self, model_name: str):
+        """Initialize a model client.
+        
+        Args:
+            model_name: Name of the model to use
+        """
+        self.model_name = model_name
