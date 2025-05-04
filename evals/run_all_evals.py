@@ -21,12 +21,24 @@ class SimpleLogger:
         return self._logs
 
 
-async def run_all_evals():
+async def run_all_evals(only_observe=True, model_name=None):
+    """
+    Run all evaluation functions found in the evals directory structure.
+    
+    Args:
+        only_observe: If True, only run evaluations in the observe directory
+        model_name: Model name to use (defaults to environment variable or gpt-4o)
+        
+    Returns:
+        Dictionary mapping module names to evaluation results
+    """
     eval_functions = {}
     # The base path is the directory in which this file resides (i.e. the evals folder)
     base_path = os.path.dirname(__file__)
-    # Only process evals from these sub repositories
-    allowed_dirs = {"act", "extract", "observe"}
+    # Determine which directories to process
+    allowed_dirs = {"observe"} if only_observe else {"act", "extract", "observe"}
+    
+    print(f"Running evaluations from these directories: {', '.join(allowed_dirs)}")
 
     # Recursively walk through the evals directory and its children
     for root, _, files in os.walk(base_path):
@@ -67,22 +79,60 @@ async def run_all_evals():
 
     results = {}
     logger = SimpleLogger()
-    model_name = "gpt-4o"  # default model name to pass
+    
+    # Determine model name to use
+    if not model_name:
+        model_name = os.getenv("MODEL_NAME") or os.getenv("OPENAI_MODEL") or "gpt-4o"
+    print(f"Using model: {model_name}")
+    
+    # Check if required environment variables are set
+    if not os.getenv("OPENAI_API_KEY") and not os.getenv("MODEL_API_KEY"):
+        print("WARNING: Neither OPENAI_API_KEY nor MODEL_API_KEY environment variables are set")
+    
+    # In LOCAL mode, we need to check if required env variables are set
+    if not os.getenv("BROWSERBASE_API_KEY") or not os.getenv("BROWSERBASE_PROJECT_ID"):
+        print("Running in LOCAL mode (no BROWSERBASE_API_KEY or BROWSERBASE_PROJECT_ID set)")
+        if not os.getenv("OPENAI_API_KEY"):
+            print("WARNING: OPENAI_API_KEY is required for LOCAL mode")
 
     # Run each eval function. If the function signature includes "use_text_extract", pass a default value.
     for module_path, func in eval_functions.items():
-        sig = inspect.signature(func)
-        if "use_text_extract" in sig.parameters:
-            result = await func(model_name, logger, False)
-        else:
-            result = await func(model_name, logger)
-        results[module_path] = result
+        print(f"\n----- Running {module_path} -----")
+        try:
+            sig = inspect.signature(func)
+            if "use_text_extract" in sig.parameters:
+                result = await func(model_name, logger, False)
+            else:
+                result = await func(model_name, logger)
+            results[module_path] = result
+            print(f"Result: {'SUCCESS' if result.get('_success') else 'FAILURE'}")
+        except Exception as e:
+            print(f"Error running {module_path}: {e}")
+            results[module_path] = {"_success": False, "error": str(e)}
 
     return results
 
 
 if __name__ == "__main__":
-    final_results = asyncio.run(run_all_evals())
-    print("Evaluation Results:")
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Run Stagehand evaluations")
+    parser.add_argument("--model", type=str, help="Model name to use")
+    parser.add_argument("--all", action="store_true", help="Run all eval types (not just observe)")
+    args = parser.parse_args()
+    
+    final_results = asyncio.run(run_all_evals(
+        only_observe=not args.all,
+        model_name=args.model
+    ))
+    
+    # Print summary of results
+    print("\n\n===== Evaluation Results Summary =====")
+    successes = sum(1 for res in final_results.values() if res.get("_success"))
+    total = len(final_results)
+    print(f"Total: {total}, Successful: {successes}, Failed: {total - successes}")
+    
     for module, res in final_results.items():
-        print(f"{module}: {res}")
+        status = "SUCCESS" if res.get("_success") else "FAILURE"
+        error = f": {res.get('error')}" if not res.get("_success") and "error" in res else ""
+        print(f"{module}: {status}{error}")

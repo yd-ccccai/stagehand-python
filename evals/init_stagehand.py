@@ -11,7 +11,8 @@ async def init_stagehand(model_name: str, logger, dom_settle_timeout_ms: int = 3
 
     This function creates a configuration from environment variables, initializes
     the Stagehand client, and returns a tuple of (stagehand, init_response).
-    The init_response contains debug and session URLs.
+    The init_response contains debug and session URLs if using BROWSERBASE, or
+    None values if running in LOCAL mode.
 
     Args:
         model_name (str): The name of the AI model to use.
@@ -20,37 +21,51 @@ async def init_stagehand(model_name: str, logger, dom_settle_timeout_ms: int = 3
 
     Returns:
         tuple: (stagehand, init_response) where init_response is a dict containing:
-            - "debugUrl": A dict with a "value" key for the debug URL.
-            - "sessionUrl": A dict with a "value" key for the session URL.
+            - "debugUrl": A dict with a "value" key for the debug URL (or None in LOCAL mode).
+            - "sessionUrl": A dict with a "value" key for the session URL (or None in LOCAL mode).
     """
-    # Build a Stagehand configuration object using environment variables
+    # Determine whether to use BROWSERBASE or LOCAL mode
+    env_mode = (
+        "BROWSERBASE" 
+        if os.getenv("BROWSERBASE_API_KEY") and os.getenv("BROWSERBASE_PROJECT_ID")
+        else "LOCAL"
+    )
+    logger.info(f"Using environment mode: {env_mode}")
+    
+    # Build a Stagehand configuration object
     config = StagehandConfig(
-        env=(
-            "BROWSERBASE"
-            if os.getenv("BROWSERBASE_API_KEY") and os.getenv("BROWSERBASE_PROJECT_ID")
-            else "LOCAL"
-        ),
+        env=env_mode,
         api_key=os.getenv("BROWSERBASE_API_KEY"),
         project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
         debug_dom=True,
-        headless=True,
+        headless=True,  # Set to False for debugging if needed
         dom_settle_timeout_ms=dom_settle_timeout_ms,
         model_name=model_name,
-        model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
+        model_client_options={"apiKey": os.getenv("MODEL_API_KEY") or os.getenv("OPENAI_API_KEY")},
+        local_browser_launch_options={
+            "headless": True,  # Set to False for debugging if needed
+            "viewport": {"width": 1024, "height": 768},
+        },
     )
 
-    # Create a Stagehand client with the configuration; server_url is taken from
-    # environment variables.
+    # Create a Stagehand client with the configuration
     stagehand = Stagehand(
-        config=config, server_url=os.getenv("STAGEHAND_SERVER_URL"), verbose=2
+        config=config,
+        server_url=os.getenv("STAGEHAND_SERVER_URL"),
+        verbose=2,
+        on_log=lambda log: logger.info(f"Stagehand log: {log}"),
     )
+    
+    # Initialize the stagehand client
     await stagehand.init()
-
-    # Construct the URL from the session id using the new format.
-    # For example:
-    # "wss://connect.browserbase.com?apiKey=bb_live_1KG6TTh14CYTJdyNTLpnugz9kgk&sessionId=<session_id>"
-    api_key = os.getenv("BROWSERBASE_API_KEY")
-    url = f"wss://connect.browserbase.com?apiKey={api_key}&sessionId={stagehand.session_id}"
-
-    # Return both URLs as dictionaries with the "value" key.
-    return stagehand, {"debugUrl": {"value": url}, "sessionUrl": {"value": url}}
+    
+    # For BROWSERBASE mode, construct debug and session URLs
+    if env_mode == "BROWSERBASE" and stagehand.session_id:
+        api_key = os.getenv("BROWSERBASE_API_KEY")
+        url = f"wss://connect.browserbase.com?apiKey={api_key}&sessionId={stagehand.session_id}"
+        init_response = {"debugUrl": {"value": url}, "sessionUrl": {"value": url}}
+    else:
+        # For LOCAL mode, provide None values for the URLs
+        init_response = {"debugUrl": {"value": None}, "sessionUrl": {"value": None}}
+    
+    return stagehand, init_response
