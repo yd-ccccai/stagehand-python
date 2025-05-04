@@ -57,7 +57,7 @@ async def init_stagehand(model_name: str, logger, dom_settle_timeout_ms: int = 3
             stagehand_params["server_url"] = os.getenv("STAGEHAND_SERVER_URL")
     else:  # LOCAL mode
         stagehand_params["local_browser_launch_options"] = {
-            "headless": True,  # Set to False for debugging if needed
+            "headless": False,  # Set to False for debugging if needed
             "viewport": {"width": 1024, "height": 768},
         }
     
