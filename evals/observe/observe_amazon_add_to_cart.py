@@ -1,7 +1,7 @@
 import asyncio
 
 from evals.init_stagehand import init_stagehand
-from stagehand.schemas import ObserveOptions, ActionOptions
+from stagehand.schemas import ObserveOptions, ActOptions
 
 
 async def observe_amazon_add_to_cart(model_name: str, logger) -> dict:

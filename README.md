@@ -449,6 +449,45 @@ config = StagehandConfig(
 )
 ```
 
+## Running Evaluation Tests
+
+Stagehand comes with a set of evaluation tests that can be used to verify functionality with different LLM models. These tests are located in the `evals/observe` directory.
+
+### Running a Specific Evaluation Test
+
+You can run a specific evaluation test using the `test_observe.py` script:
+
+```bash
+# Run the taxes evaluation test
+python -m evals.test_observe taxes
+
+# Run with a specific model
+python -m evals.test_observe taxes --model gpt-4o
+```
+
+### Available Evaluation Tests
+
+- `taxes`: Evaluates finding form inputs on a tax website
+- `amazon_add_to_cart`: Tests adding a product to cart on Amazon and proceeding to checkout
+
+### Creating Your Own Evaluation Tests
+
+You can create your own evaluation tests by adding new files to the `evals/observe` directory. Each test should:
+1. Follow the naming convention `observe_[test_name].py`
+2. Include a function named the same as the file (e.g., `observe_taxes` in `observe_taxes.py`)
+3. Accept `model_name` and `logger` parameters
+4. Return a dictionary with an `_success` boolean field indicating whether the test passed
+
+Example structure:
+```python
+async def observe_your_test(model_name: str, logger) -> dict:
+    # Test implementation
+    return {
+        "_success": True,  # or False if the test failed
+        # Additional result data
+    }
+```
+
 ## License
 
 MIT License (c) 2025 Browserbase, Inc.
