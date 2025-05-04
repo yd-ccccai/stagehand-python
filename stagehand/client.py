@@ -360,7 +360,6 @@ class Stagehand(StagehandBase):
                     )
 
                 # 3. Prepare Launch Options (translate keys if needed)
-                # Playwright Python uses snake_case, TS uses camelCase
                 launch_options = {
                     "headless": self.local_browser_launch_options.get(
                         "headless", False
@@ -395,9 +394,7 @@ class Stagehand(StagehandBase):
                     "ignore_https_errors": self.local_browser_launch_options.get(
                         "ignoreHTTPSErrors", True
                     ),
-                    # ... add others like permissions, geolocation, etc.
                 }
-                # Remove None values
                 launch_options = {
                     k: v for k, v in launch_options.items() if v is not None
                 }
@@ -412,9 +409,7 @@ class Stagehand(StagehandBase):
                     )
                     self.context = await StagehandContext.init(self._context, self)
                     self.logger.info("Local browser context launched successfully.")
-                    self._browser = (
-                        self._context.browser
-                    )  # Assign context to _browser for consistency in close()
+                    self._browser = self._context.browser
 
                 except Exception as e:
                     self.logger.error(
@@ -496,7 +491,6 @@ class Stagehand(StagehandBase):
                 self._client = None
 
         elif self.env == "LOCAL":
-            # --- LOCAL Cleanup ---
             if self._context:
                 try:
                     self.logger.debug("Closing local browser context...")
