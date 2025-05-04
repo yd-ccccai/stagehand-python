@@ -313,14 +313,14 @@ function getNodePath(el) {
     // text nodes are handled differently in XPath
     if (current.nodeName !== "#text") {
       const tagName = current.nodeName.toLowerCase();
-      const pathIndex = hasSameTypeSiblings ? \`[\${index}]\` : "";
-      parts.unshift(\`\${tagName}\${pathIndex}\`);
+      const pathIndex = hasSameTypeSiblings ? `[${index}]` : "";
+      parts.unshift(`${tagName}${pathIndex}`);
     }
     
     current = current.parentElement;
   }
 
-  return parts.length ? \`/\${parts.join("/")}\` : "";
+  return parts.length ? `/${parts.join("/")}` : "";
 }
 """
 
@@ -364,7 +364,7 @@ def find_scrollable_element_ids(stagehand_page: SyncStagehandPage) -> set[int]:
     cdp_session = None
     try:
         # Create a single CDP session for efficiency
-        cdp_session = stagehand_page.context.new_cdp_session(stagehand_page.page)
+        cdp_session = stagehand_page.context.new_cdp_session(stagehand_page._page)
 
         for xpath in xpaths:
             if not xpath or not isinstance(xpath, str):

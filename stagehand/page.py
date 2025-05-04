@@ -154,7 +154,9 @@ class StagehandPage:
         """
         await self.ensure_injection()
         if self._stagehand.env == "LOCAL":
-            self._stagehand.logger.warning("Local execution of act is not implemented")
+            self._stagehand.logger.warning(
+                "Local execution of observe is not implemented"
+            )
             return []
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
@@ -190,7 +192,9 @@ class StagehandPage:
         """
         await self.ensure_injection()
         if self._stagehand.env == "LOCAL":
-            self._stagehand.logger.warning("Local execution of act is not implemented")
+            self._stagehand.logger.warning(
+                "Local execution of extract is not implemented"
+            )
             return None
         # Allow for no options to extract the entire page
         if options is None:
