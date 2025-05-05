@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 import time
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from stagehand.page import StagehandPage
@@ -18,7 +18,7 @@ from ..utils import StagehandLogger, format_simplified_tree
 
 async def _clean_structural_nodes(
     node: AccessibilityNode,
-    page: Optional['StagehandPage'],
+    page: Optional["StagehandPage"],
     logger: Optional[StagehandLogger],
 ) -> Optional[AccessibilityNode]:
     """Helper function to remove or collapse unnecessary structural nodes."""
@@ -124,7 +124,7 @@ def _extract_url_from_ax_node(
 
 async def build_hierarchical_tree(
     nodes: list[AXNode],
-    page: Optional['StagehandPage'],
+    page: Optional["StagehandPage"],
     logger: Optional[StagehandLogger],
 ) -> TreeResult:
     """Builds a hierarchical tree structure from a flat array of accessibility nodes."""
@@ -221,7 +221,7 @@ async def build_hierarchical_tree(
 
 
 async def get_accessibility_tree(
-    page: 'StagehandPage',
+    page: "StagehandPage",
     logger: StagehandLogger,
 ) -> TreeResult:
     """Retrieves the full accessibility tree via CDP and transforms it."""
@@ -273,7 +273,7 @@ async def get_accessibility_tree(
     finally:
         # Ensure Accessibility domain is disabled even if errors occur
         # Need to check if page object still exists and has a CDP session
-        if page and hasattr(page, '_cdp_session') and page._cdp_session:
+        if page and hasattr(page, "_cdp_session") and page._cdp_session:
             try:
                 await page.disable_cdp_domain("Accessibility")
             except Exception:
@@ -357,7 +357,7 @@ async def get_xpath_by_resolved_object_id(
         return ""
 
 
-async def find_scrollable_element_ids(stagehand_page: 'StagehandPage') -> set[int]:
+async def find_scrollable_element_ids(stagehand_page: "StagehandPage") -> set[int]:
     """Identifies backendNodeIds of scrollable elements in the DOM."""
     # Ensure getScrollableElementXpaths is defined in the page context
     try:

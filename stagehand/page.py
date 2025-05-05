@@ -2,6 +2,8 @@ from typing import Optional, Union
 
 from playwright.async_api import CDPSession, Page
 
+from stagehand.handlers.observe_handler import ObserveHandler
+
 from .schemas import (
     ActOptions,
     ActResult,
@@ -10,7 +12,6 @@ from .schemas import (
     ObserveOptions,
     ObserveResult,
 )
-from stagehand.handlers.observe_handler import ObserveHandler
 
 _INJECTION_SCRIPT = None
 

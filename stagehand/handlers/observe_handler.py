@@ -114,7 +114,9 @@ class ObserveHandler:
             elements, selector_map, use_accessibility_tree
         )
 
-        self.logger.info("Found elements", auxiliary={"elements": elements_with_selectors})
+        self.logger.info(
+            "Found elements", auxiliary={"elements": elements_with_selectors}
+        )
 
         # Draw overlay if requested
         if options.draw_overlay:
@@ -148,7 +150,8 @@ class ObserveHandler:
             if use_accessibility_tree:
                 # Generate xpath for element using CDP
                 self.logger.info(
-                    "Getting xpath for element", auxiliary={"elementId": str(element_id)}
+                    "Getting xpath for element",
+                    auxiliary={"elementId": str(element_id)},
                 )
 
                 args = {"backendNodeId": element_id}
