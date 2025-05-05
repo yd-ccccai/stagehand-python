@@ -695,14 +695,14 @@ def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
 async def draw_observe_overlay(page, elements):
     """
     Draw an overlay on the page highlighting the observed elements.
-    
+
     Args:
         page: Playwright page object
         elements: List of observation results with selectors
     """
     if not elements:
         return
-        
+
     # Create a function to inject and execute in the page context
     script = """
     (elements) => {
@@ -812,7 +812,7 @@ async def draw_observe_overlay(page, elements):
         }, 5000);
     }
     """
-    
+
     # Execute the script in the page context
     await page.evaluate(script, elements)
 
@@ -820,82 +820,80 @@ async def draw_observe_overlay(page, elements):
 async def get_accessibility_tree(page, logger=None):
     """
     Get the accessibility tree from the page via CDP.
-    
+
     Args:
         page: StagehandPage instance
         logger: Optional logger function
-        
+
     Returns:
         Dict containing the simplified and raw accessibility tree
     """
     try:
         # Enable accessibility domain
         await page.enable_cdp_domain("Accessibility")
-        
+
         # Fetch the accessibility tree
         result = await page.send_cdp("Accessibility.getFullAXTree")
-        
+
         # Process the nodes to create a simplified text representation
         simplified = await _simplify_accessibility_tree(page, result, logger)
-        
+
         # Find iframe nodes
         iframes = []
         for node in result.get("nodes", []):
             role = node.get("role", {}).get("value", "").lower()
             if role == "iframe":
                 iframes.append(node)
-                
-        return {
-            "simplified": simplified,
-            "iframes": iframes,
-            "raw": result
-        }
-        
+
+        return {"simplified": simplified, "iframes": iframes, "raw": result}
+
     except Exception as e:
         if logger:
             logger.error(f"Error getting accessibility tree: {e}")
         return {
             "simplified": "Error getting accessibility tree",
             "iframes": [],
-            "raw": {}
+            "raw": {},
         }
+
 
 async def _simplify_accessibility_tree(page, tree_data, logger=None):
     """
     Convert the raw accessibility tree to a simplified text representation.
-    
+
     Args:
         page: StagehandPage instance
         tree_data: Raw accessibility tree data
         logger: Optional logger function
-        
+
     Returns:
         String containing simplified tree representation
     """
     nodes = tree_data.get("nodes", [])
     if not nodes:
         return "No accessibility nodes found"
-        
+
     # Create a map of node IDs to nodes
     node_map = {node.get("nodeId"): node for node in nodes}
-    
+
     # Find the root node
     root_nodes = [node for node in nodes if not node.get("parentId")]
     if not root_nodes:
         return "No root node found in accessibility tree"
-        
+
     root_node = root_nodes[0]
-    
+
     # Process the tree recursively
     lines = []
     await _process_node(root_node, node_map, lines, 0, page, logger)
-    
+
     return "\n".join(lines)
+
 
 async def _process_node(node, node_map, lines, indent, page, logger=None):
     """
     Process a single node in the accessibility tree.
-    
+
     Args:
         node: The current node
         node_map: Map of node IDs to nodes
@@ -908,7 +906,7 @@ async def _process_node(node, node_map, lines, indent, page, logger=None):
         node_id = node.get("nodeId")
         role = node.get("role", {}).get("value", "")
         name = node.get("name", {}).get("value", "")
-        
+
         # Get additional properties if available
         properties = {}
         for prop in node.get("properties", []):
@@ -916,53 +914,57 @@ async def _process_node(node, node_map, lines, indent, page, logger=None):
             prop_value = prop.get("value", {}).get("value", "")
             if prop_name and prop_value:
                 properties[prop_name] = prop_value
-                
+
         # Format node information
         node_info = f"ID:{node_id} Role:{role}"
         if name:
             node_info += f" Name:{name}"
-            
+
         # Add value if available
         if "value" in properties:
             node_info += f" Value:{properties['value']}"
-            
+
         # Add checked state if available
         if "checked" in properties:
             node_info += f" Checked:{properties['checked']}"
-            
+
         # Add clickable if available
         if "clickable" in properties:
             node_info += f" Clickable:{properties['clickable']}"
-            
+
         # Add the line to the output
         lines.append(f"{'  ' * indent}{node_info}")
-        
+
         # Process child nodes
         for child_id in node.get("childIds", []):
             child_node = node_map.get(child_id)
             if child_node:
-                await _process_node(child_node, node_map, lines, indent + 1, page, logger)
-                
+                await _process_node(
+                    child_node, node_map, lines, indent + 1, page, logger
+                )
+
     except Exception as e:
         if logger:
             logger.error(f"Error processing accessibility node: {e}")
         lines.append(f"{'  ' * indent}Error processing node: {str(e)}")
 
+
 async def get_xpath_by_object_id(cdp_client, object_id):
     """
     Get the XPath for an element by its object ID.
-    
+
     Args:
         cdp_client: CDP client
         object_id: Element's object ID
-        
+
     Returns:
         XPath string for the element
     """
     result = await cdp_client.send(
         "Runtime.callFunctionOn",
         {
-            "functionDeclaration": """
+            "functionDeclaration": (
+                """
             function() {
                 function getXPath(node) {
                     if (node.nodeType !== 1) return '';
@@ -976,45 +978,47 @@ async def get_xpath_by_object_id(cdp_client, object_id):
                 }
                 return getXPath(this);
             }
-            """,
+            """
+            ),
             "objectId": object_id,
-            "returnByValue": True
-        }
+            "returnByValue": True,
+        },
     )
-    
+
     return result.get("result", {}).get("value", "")
+
 
 async def perform_playwright_method(page, logger, method, arguments, selector):
     """
     Perform a Playwright method on an element identified by selector.
-    
+
     Args:
         page: StagehandPage instance
         logger: Logger instance
         method: Method name to perform (e.g., "click", "fill")
         arguments: List of arguments for the method
         selector: Element selector (CSS or XPath)
-        
+
     Returns:
         Result of the method call
     """
     try:
         # Determine if the selector is an XPath
         is_xpath = selector.startswith("//") or selector.startswith("(//")
-        
+
         # Get the Playwright locator
         if is_xpath:
             element = page.locator(f"xpath={selector}")
         else:
             element = page.locator(selector)
-        
+
         # Log what we're doing
         if logger:
             logger.info(
                 f"Performing '{method}' on element with selector: {selector}",
-                extra={"arguments": arguments}
+                extra={"arguments": arguments},
             )
-        
+
         # Call the appropriate method on the locator
         if method == "click":
             return await element.click()
@@ -1042,12 +1046,12 @@ async def perform_playwright_method(page, logger, method, arguments, selector):
                 func = getattr(element, method.replace("_", ""))
                 if callable(func):
                     return await func(*arguments)
-            
+
             # If we get here, the method is not supported
             if logger:
                 logger.error(f"Unsupported method: {method}")
             raise ValueError(f"Unsupported method: {method}")
-            
+
     except Exception as e:
         if logger:
             logger.error(f"Error performing {method}: {e}")
