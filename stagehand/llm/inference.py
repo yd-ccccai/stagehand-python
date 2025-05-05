@@ -2,11 +2,11 @@
 
 import json
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 import litellm
 
-from stagehand.prompts import (
+from stagehand.llm.prompts import (
     build_observe_system_prompt,
     build_observe_user_prompt,
 )
@@ -23,7 +23,7 @@ async def observe(
     return_action: bool = False,
     log_inference_to_file: bool = False,
     from_act: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Call LLM to find elements in the DOM based on an instruction.
 
@@ -40,7 +40,7 @@ async def observe(
         from_act: Whether this observe call is part of an act operation
 
     Returns:
-        Dict containing elements found and token usage information
+        dict containing elements found and token usage information
     """
     if logger:
         logger.info(f"Preparing observe inference for instruction: {instruction}")

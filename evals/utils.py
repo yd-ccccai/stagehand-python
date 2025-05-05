@@ -1,7 +1,7 @@
 import difflib
 import os
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 # Try to import LiteLLM, which is used for model inference
 try:
@@ -32,7 +32,7 @@ class SimpleModelClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a completion for the given prompt.
 
@@ -43,7 +43,7 @@ class SimpleModelClient:
             max_tokens: Maximum number of tokens to generate
 
         Returns:
-            Dictionary with completion results, including 'text' key
+            dictionary with completion results, including 'text' key
         """
         if litellm is None:
             raise ImportError(

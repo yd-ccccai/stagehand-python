@@ -1,6 +1,6 @@
 """Observe handler for performing observations of page elements using LLMs."""
 
-from typing import Any, Dict, List
+from typing import Any
 
 from stagehand.schemas import ObserveOptions, ObserveResult
 from stagehand.utils import (
@@ -33,7 +33,7 @@ class ObserveHandler:
         self,
         options: ObserveOptions,
         request_id: str,
-    ) -> List[ObserveResult]:
+    ) -> list[ObserveResult]:
         """
         Execute an observation operation locally.
 
@@ -42,7 +42,7 @@ class ObserveHandler:
             request_id: Unique identifier for the request
 
         Returns:
-            List of ObserveResult instances
+            list of ObserveResult instances
         """
         instruction = options.instruction
         if not instruction:
@@ -128,20 +128,20 @@ class ObserveHandler:
 
     async def _add_selectors_to_elements(
         self,
-        elements: List[Dict[str, Any]],
-        selector_map: Dict[str, List[str]],
+        elements: list[dict[str, Any]],
+        selector_map: dict[str, list[str]],
         use_accessibility_tree: bool,
-    ) -> List[ObserveResult]:
+    ) -> list[ObserveResult]:
         """
         Add selectors to elements based on their element IDs.
 
         Args:
-            elements: List of elements from LLM response
+            elements: list of elements from LLM response
             selector_map: Mapping of element IDs to selectors
             use_accessibility_tree: Whether using accessibility tree
 
         Returns:
-            List of elements with selectors added
+            list of elements with selectors added
         """
         result = []
 
