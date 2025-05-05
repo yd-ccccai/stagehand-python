@@ -2,6 +2,8 @@ from typing import Optional, Union
 
 from playwright.async_api import CDPSession, Page
 
+from stagehand.handlers.observe_handler import ObserveHandler
+
 from .schemas import (
     ActOptions,
     ActResult,
@@ -155,7 +157,7 @@ class StagehandPage:
             list[ObserveResult]: A list of observation results from the Stagehand server.
         """
         await self.ensure_injection()
-        
+
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
             options = ObserveOptions(instruction=options)
@@ -166,28 +168,26 @@ class StagehandPage:
         # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
             # Import here to avoid circular imports
-            from stagehand.handlers.observe_handler import ObserveHandler
-            
             # Create request ID
             import uuid
+
             request_id = str(uuid.uuid4())
-            
+
             # If we don't have an observe handler yet, create one
+            # TODO: revisit passing user_provided_instructions
             if not hasattr(self._stagehand, "_observe_handler"):
                 self._stagehand._observe_handler = ObserveHandler(
-                    self, 
-                    self._stagehand,
-                    self._stagehand.user_provided_instructions
+                    self, self._stagehand, ""
                 )
-                
+
             # Call local observe implementation
             result = await self._stagehand._observe_handler.observe(
                 options,
                 request_id,
             )
-            
+
             return result
-            
+
         # Otherwise use API implementation
         payload = options.model_dump(exclude_none=True, by_alias=True)
         lock = self._stagehand._get_lock_for_session()
@@ -331,30 +331,33 @@ class StagehandPage:
             except Exception as e:
                 self._stagehand.logger.warning(f"Error detaching CDP client: {e}")
         self._cdp_client = None
-        
+
     async def _wait_for_settled_dom(self, timeout_ms: int = None):
         """
         Wait for the DOM to settle (stop changing) before proceeding.
-        
+
         Args:
             timeout_ms (int, optional): Maximum time to wait in milliseconds.
                 If None, uses the stagehand client's dom_settle_timeout_ms.
         """
         try:
-            timeout = timeout_ms or getattr(self._stagehand, "dom_settle_timeout_ms", 30000)
+            timeout = timeout_ms or getattr(
+                self._stagehand, "dom_settle_timeout_ms", 30000
+            )
             import asyncio
-            
+
             # Wait for domcontentloaded first
             await self._page.wait_for_load_state("domcontentloaded")
-            
+
             # Create a timeout promise that resolves after the specified time
             timeout_task = asyncio.create_task(asyncio.sleep(timeout / 1000))
-            
+
             # Try to check if the DOM has settled
             try:
                 # Create a task for evaluating the DOM settling
                 eval_task = asyncio.create_task(
-                    self._page.evaluate("""
+                    self._page.evaluate(
+                        """
                         () => {
                             return new Promise((resolve) => {
                                 if (typeof window.waitForDomSettle === 'function') {
@@ -365,33 +368,36 @@ class StagehandPage:
                                 }
                             });
                         }
-                    """)
+                    """
+                    )
                 )
-                
+
                 # Create tasks for other ways to determine page readiness
-                dom_task = asyncio.create_task(self._page.wait_for_load_state("domcontentloaded"))
+                dom_task = asyncio.create_task(
+                    self._page.wait_for_load_state("domcontentloaded")
+                )
                 body_task = asyncio.create_task(self._page.wait_for_selector("body"))
-                
+
                 # Wait for the first task to complete
                 done, pending = await asyncio.wait(
                     [eval_task, dom_task, body_task, timeout_task],
-                    return_when=asyncio.FIRST_COMPLETED
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
-                
+
                 # Cancel any pending tasks
                 for task in pending:
                     task.cancel()
-                
+
                 # If the timeout was hit, log a warning
                 if timeout_task in done:
                     self._stagehand.logger.warning(
                         "DOM settle timeout exceeded, continuing anyway",
-                        extra={"timeout_ms": timeout}
+                        extra={"timeout_ms": timeout},
                     )
-                    
+
             except Exception as e:
                 self._stagehand.logger.warning(f"Error waiting for DOM to settle: {e}")
-                
+
         except Exception as e:
             self._stagehand.logger.error(f"Error in _wait_for_settled_dom: {e}")
 

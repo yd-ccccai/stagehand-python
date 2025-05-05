@@ -818,19 +818,22 @@ class Stagehand(StagehandBase):
             self.logger.debug("Stealth init script added successfully.")
         except Exception as e:
             self.logger.error(f"Failed to add stealth init script: {str(e)}")
-            
+
     def _setup_llm_client(self):
         """
         Set up LLM client for LOCAL mode to support model inference.
         Uses LiteLLM for model inference.
         """
         import litellm
+
         self.llm_client = litellm
-        
+
         # Fix: Use self.model_name instead of self.config.model_name
-        model_name = self.model_name if hasattr(self, 'model_name') else "gpt-4o"
-        
+        model_name = self.model_name if hasattr(self, "model_name") else "gpt-4o"
+
         # Set API key globally from model_client_options if specified
         if self.model_client_options and "apiKey" in self.model_client_options:
             litellm.api_key = self.model_client_options["apiKey"]
-            print("Set global litellm.api_key. Prefer provider-specific environment variables.")
+            print(
+                "Set global litellm.api_key. Prefer provider-specific environment variables."
+            )
