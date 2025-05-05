@@ -2,12 +2,9 @@
 
 from typing import Any
 
+from stagehand.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
 from stagehand.schemas import ObserveOptions, ObserveResult
-from stagehand.utils import (
-    draw_observe_overlay,
-    get_accessibility_tree,
-    get_xpath_by_object_id,
-)
+from stagehand.utils import draw_observe_overlay
 
 
 class ObserveHandler:
@@ -81,7 +78,7 @@ class ObserveHandler:
             selector_map = eval_result.get("selectorMap", {})
 
         # Call LLM to process the DOM and find elements
-        from stagehand.inference import observe as observe_inference
+        from stagehand.llm.inference import observe as observe_inference
 
         observation_response = await observe_inference(
             instruction=instruction,
@@ -96,10 +93,10 @@ class ObserveHandler:
             from_act=False,
         )
 
-        # Update metrics for token usage
-        prompt_tokens = observation_response.get("prompt_tokens", 0)
-        completion_tokens = observation_response.get("completion_tokens", 0)
-        inference_time_ms = observation_response.get("inference_time_ms", 0)
+        # TODO: Update metrics for token usage
+        # prompt_tokens = observation_response.get("prompt_tokens", 0)
+        # completion_tokens = observation_response.get("completion_tokens", 0)
+        # inference_time_ms = observation_response.get("inference_time_ms", 0)
 
         # Add iframes to the response if any
         elements = observation_response.get("elements", [])
@@ -167,7 +164,7 @@ class ObserveHandler:
 
                 # Use our utility function to get the XPath
                 cdp_client = await self.stagehand_page.get_cdp_client()
-                xpath = await get_xpath_by_object_id(cdp_client, object_id)
+                xpath = await get_xpath_by_resolved_object_id(cdp_client, object_id)
 
                 if not xpath:
                     self.logger.info(f"Empty xpath returned for element: {element_id}")
