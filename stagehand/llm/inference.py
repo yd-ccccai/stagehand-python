@@ -8,14 +8,14 @@ import litellm
 
 from stagehand.llm.prompts import (
     build_observe_system_prompt,
-    build_observe_user_prompt,
+    build_observe_user_message,
 )
 
 
 # TODO: kwargs
 async def observe(
     instruction: str,
-    dom_elements: str,
+    tree_elements: str,
     llm_client: Any,
     request_id: str,
     user_provided_instructions: Optional[str] = None,
@@ -49,9 +49,9 @@ async def observe(
         user_provided_instructions=user_provided_instructions,
     )
 
-    user_prompt = build_observe_user_prompt(
+    user_prompt = build_observe_user_message(
         instruction=instruction,
-        dom_elements=dom_elements,
+        tree_elements=tree_elements,
     )
 
     # Prepare the schema for the response

@@ -50,7 +50,7 @@ class ObserveHandler:
                 "multiple elements that may be relevant for future actions, return all of them."
             )
 
-        self.logger.info("Starting observation", extra={"instruction": instruction})
+        self.logger.info("Starting observation", auxiliary={"instruction": instruction})
 
         # Determine if we should use accessibility tree or standard DOM processing
         use_accessibility_tree = not options.only_visible
@@ -82,12 +82,11 @@ class ObserveHandler:
 
         observation_response = await observe_inference(
             instruction=instruction,
-            dom_elements=output_string,
+            tree_elements=output_string,
             llm_client=self.stagehand.llm_client,
             request_id=request_id,
             user_provided_instructions=self.user_provided_instructions,
             logger=self.logger,
-            is_using_accessibility_tree=use_accessibility_tree,
             return_action=options.return_action,
             log_inference_to_file=False,  # TODO: Implement logging to file if needed
             from_act=False,
@@ -115,7 +114,7 @@ class ObserveHandler:
             elements, selector_map, use_accessibility_tree
         )
 
-        self.logger.info("Found elements", extra={"elements": elements_with_selectors})
+        self.logger.info("Found elements", auxiliary={"elements": elements_with_selectors})
 
         # Draw overlay if requested
         if options.draw_overlay:
@@ -149,7 +148,7 @@ class ObserveHandler:
             if use_accessibility_tree:
                 # Generate xpath for element using CDP
                 self.logger.info(
-                    "Getting xpath for element", extra={"elementId": str(element_id)}
+                    "Getting xpath for element", auxiliary={"elementId": str(element_id)}
                 )
 
                 args = {"backendNodeId": element_id}

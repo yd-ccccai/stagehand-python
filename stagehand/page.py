@@ -10,6 +10,7 @@ from .schemas import (
     ObserveOptions,
     ObserveResult,
 )
+from stagehand.handlers.observe_handler import ObserveHandler
 
 _INJECTION_SCRIPT = None
 
@@ -169,14 +170,13 @@ class StagehandPage:
             # Create request ID
             import uuid
 
-            from stagehand.handlers.observe_handler import ObserveHandler
-
             request_id = str(uuid.uuid4())
 
             # If we don't have an observe handler yet, create one
+            # TODO: revisit passing user_provided_instructions
             if not hasattr(self._stagehand, "_observe_handler"):
                 self._stagehand._observe_handler = ObserveHandler(
-                    self, self._stagehand, self._stagehand.user_provided_instructions
+                    self, self._stagehand, ""
                 )
 
             # Call local observe implementation

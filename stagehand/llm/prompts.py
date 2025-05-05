@@ -186,13 +186,13 @@ Return an array of elements that match the instruction if they exist, otherwise 
 
 def build_observe_user_message(
     instruction: str,
-    dom_elements: str,
+    tree_elements: str,
 ) -> ChatMessage:
     tree_or_dom = "Accessibility Tree"
     return ChatMessage(
         role="user",
         content=f"""instruction: {instruction}
-{tree_or_dom}: {dom_elements}""",
+{tree_or_dom}: {tree_elements}""",
     )
 
 

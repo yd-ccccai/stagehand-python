@@ -2,7 +2,6 @@ from .agent import Agent
 from .client import Stagehand
 from .config import StagehandConfig
 from .handlers.observe_handler import ObserveHandler
-from .inference import observe
 from .page import StagehandPage
 from .schemas import (
     ActOptions,
