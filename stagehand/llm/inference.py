@@ -12,6 +12,7 @@ from stagehand.llm.prompts import (
 )
 
 
+# TODO: kwargs
 async def observe(
     instruction: str,
     dom_elements: str,
@@ -19,7 +20,6 @@ async def observe(
     request_id: str,
     user_provided_instructions: Optional[str] = None,
     logger: Optional[Callable] = None,
-    is_using_accessibility_tree: bool = False,
     return_action: bool = False,
     log_inference_to_file: bool = False,
     from_act: bool = False,
@@ -34,7 +34,6 @@ async def observe(
         request_id: Unique ID for this request
         user_provided_instructions: Optional custom system instructions
         logger: Optional logger function
-        is_using_accessibility_tree: Whether using accessibility tree vs DOM
         return_action: Whether to include action suggestions in response
         log_inference_to_file: Whether to log inference to file
         from_act: Whether this observe call is part of an act operation
@@ -48,13 +47,11 @@ async def observe(
     # Build the prompts
     system_prompt = build_observe_system_prompt(
         user_provided_instructions=user_provided_instructions,
-        is_using_accessibility_tree=is_using_accessibility_tree,
     )
 
     user_prompt = build_observe_user_prompt(
         instruction=instruction,
         dom_elements=dom_elements,
-        is_using_accessibility_tree=is_using_accessibility_tree,
     )
 
     # Prepare the schema for the response

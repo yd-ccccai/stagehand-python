@@ -136,6 +136,7 @@ Strictly abide by the following criteria:
    - There are still chunks left to process (chunksTotal > chunksSeen)"""
 
 
+# TODO: remove these as no longer used
 def build_metadata_system_prompt() -> ChatMessage:
     return ChatMessage(role="system", content=metadata_system_prompt)
 
@@ -158,13 +159,9 @@ chunksTotal: {chunks_total}""",
 # observe
 def build_observe_system_prompt(
     user_provided_instructions: Optional[str] = None,
-    is_using_accessibility_tree: bool = False,
 ) -> ChatMessage:
-    tree_type_desc = (
-        "a hierarchical accessibility tree showing the semantic structure of the page. The tree is a hybrid of the DOM and the accessibility tree."
-        if is_using_accessibility_tree
-        else "a numbered list of possible elements"
-    )
+    tree_type_desc = "a hierarchical accessibility tree showing the semantic structure of the page. The tree is a hybrid of the DOM and the accessibility tree."
+
     observe_system_prompt_base = f"""
 You are helping the user automate the browser by finding elements based on what the user wants to observe in the page.
 
@@ -190,9 +187,8 @@ Return an array of elements that match the instruction if they exist, otherwise 
 def build_observe_user_message(
     instruction: str,
     dom_elements: str,
-    is_using_accessibility_tree: bool = False,
 ) -> ChatMessage:
-    tree_or_dom = "Accessibility Tree" if is_using_accessibility_tree else "DOM"
+    tree_or_dom = "Accessibility Tree"
     return ChatMessage(
         role="user",
         content=f"""instruction: {instruction}
