@@ -3,6 +3,7 @@ from typing import Optional, Union
 from playwright.async_api import CDPSession, Page
 
 from stagehand.handlers.observe_handler import ObserveHandler
+
 from .schemas import (
     ActOptions,
     ActResult,
@@ -174,9 +175,7 @@ class StagehandPage:
             # If we don't have an observe handler yet, create one
             # TODO: revisit passing user_provided_instructions
             if not hasattr(self, "_observe_handler"):
-                self._observe_handler = ObserveHandler(
-                    self, self._stagehand, ""
-                )
+                self._observe_handler = ObserveHandler(self, self._stagehand, "")
 
             # Call local observe implementation
             result = await self._observe_handler.observe(

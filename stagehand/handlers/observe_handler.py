@@ -3,9 +3,9 @@
 from typing import Any
 
 from stagehand.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
+from stagehand.llm.inference import observe as observe_inference
 from stagehand.schemas import ObserveOptions, ObserveResult
 from stagehand.utils import draw_observe_overlay
-from stagehand.llm.inference import observe as observe_inference
 
 
 class ObserveHandler:
@@ -53,7 +53,9 @@ class ObserveHandler:
             )
 
         self.logger.info(
-            "Starting observation", category="observe", auxiliary={"instruction": instruction}
+            "Starting observation",
+            category="observe",
+            auxiliary={"instruction": instruction},
         )
 
         # Get DOM representation
@@ -66,7 +68,7 @@ class ObserveHandler:
         self.logger.info("Getting accessibility tree data")
         output_string = tree["simplified"]
         iframes = tree.get("iframes", [])
-       
+
         # use inference to call the llm
         observation_response = await observe_inference(
             instruction=instruction,
@@ -90,7 +92,7 @@ class ObserveHandler:
         for iframe in iframes:
             elements.append(
                 {
-                    "elementId": int(iframe.get("nodeId", 0)),
+                    "element_id": int(iframe.get("nodeId", 0)),
                     "description": "an iframe",
                     "method": "not-supported",
                     "arguments": [],
@@ -125,6 +127,7 @@ class ObserveHandler:
         """
         result = []
 
+        print(elements)
         for element in elements:
             element_id = element.get("element_id")
             rest = {k: v for k, v in element.items() if k != "element_id"}
@@ -136,6 +139,7 @@ class ObserveHandler:
             )
 
             args = {"backendNodeId": element_id}
+            print(args)
             response = await self.stagehand_page.send_cdp("DOM.resolveNode", args)
             object_id = response.get("object", {}).get("objectId")
 
