@@ -16,6 +16,10 @@ from .a11y import (
 from .llm import (
     ChatMessage,
 )
+from .page import (
+    ObserveElementSchema,
+    ObserveInferenceSchema,
+)
 
 __all__ = [
     "AXProperty",
@@ -28,4 +32,6 @@ __all__ = [
     "PlaywrightCommandError",
     "PlaywrightMethodNotSupportedError",
     "ChatMessage",
+    "ObserveElementSchema",
+    "ObserveInferenceSchema",
 ]

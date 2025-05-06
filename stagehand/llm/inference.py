@@ -4,20 +4,13 @@ import json
 import time
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel
-
 from stagehand.llm.prompts import (
     build_observe_system_prompt,
     build_observe_user_message,
 )
-
-
-class ObserveInference(BaseModel):
-    elements: list[str]
-    description: str
-    method: str
-    arguments: list[str]
-
+from stagehand.types import (
+    ObserveInferenceSchema,
+)
 
 # TODO: kwargs
 async def observe(
@@ -61,24 +54,6 @@ async def observe(
         tree_elements=tree_elements,
     )
 
-    # Prepare the schema for the response
-    # element_schema = {
-    #     "elementId": "number",
-    #     "description": "string",
-    # }
-
-    # if return_action:
-    #     element_schema.update(
-    #         {
-    #             "method": "string",
-    #             "arguments": ["string"],
-    #         }
-    #     )
-
-    # schema = {"elements": [element_schema]}
-
-    # response_format = {"type": "json_object", "schema": schema}
-
     messages = [
         system_prompt,
         user_prompt,
@@ -91,7 +66,7 @@ async def observe(
         response = llm_client.create_response(
             model=llm_client.default_model,
             messages=messages,
-            response_format=ObserveInference,
+            response_format=ObserveInferenceSchema,
             temperature=0.1,
             request_id=request_id,
         )
@@ -103,7 +78,7 @@ async def observe(
 
         # Parse the response
         content = response.choices[0].message.content
-        logger.info(f"Response: {content}")
+        logger.info(f"LLM Response: {content}", category="observe")
         if isinstance(content, str):
             try:
                 parsed_response = json.loads(content)
