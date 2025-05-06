@@ -14,7 +14,7 @@ from stagehand.types import (
 
 
 # TODO: kwargs
-async def observe(
+def observe(
     instruction: str,
     tree_elements: str,
     llm_client: Any,
