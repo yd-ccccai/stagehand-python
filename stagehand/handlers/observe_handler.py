@@ -5,6 +5,7 @@ from typing import Any
 from stagehand.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
 from stagehand.schemas import ObserveOptions, ObserveResult
 from stagehand.utils import draw_observe_overlay
+from stagehand.llm.inference import observe as observe_inference
 
 
 class ObserveHandler:
@@ -51,36 +52,22 @@ class ObserveHandler:
                 "multiple elements that may be relevant for future actions, return all of them."
             )
 
-        self.logger.info("Starting observation", auxiliary={"instruction": instruction})
-
-        # Determine if we should use accessibility tree or standard DOM processing
-        use_accessibility_tree = not options.only_visible
+        self.logger.info(
+            "Starting observation", category="observe", auxiliary={"instruction": instruction}
+        )
 
         # Get DOM representation
-        selector_map = {}
         output_string = ""
         iframes = []
 
-        if use_accessibility_tree:
-            await self.stagehand_page._wait_for_settled_dom()
-            # Get accessibility tree data using our utility function
-            tree = await get_accessibility_tree(self.stagehand_page, self.logger)
-            self.logger.info("Getting accessibility tree data")
-            output_string = tree["simplified"]
-            iframes = tree.get("iframes", [])
-        else:
-            # Process standard DOM representation
-            eval_result = await self.stagehand_page._page.evaluate(
-                """() => {
-                    return window.processAllOfDom().then(result => result);
-                }"""
-            )
-            output_string = eval_result.get("outputString", "")
-            selector_map = eval_result.get("selectorMap", {})
-
-        # Call LLM to process the DOM and find elements
-        from stagehand.llm.inference import observe as observe_inference
-
+        await self.stagehand_page._wait_for_settled_dom()
+        # Get accessibility tree data using our utility function
+        tree = await get_accessibility_tree(self.stagehand_page, self.logger)
+        self.logger.info("Getting accessibility tree data")
+        output_string = tree["simplified"]
+        iframes = tree.get("iframes", [])
+       
+        # use inference to call the llm
         observation_response = await observe_inference(
             instruction=instruction,
             tree_elements=output_string,
@@ -111,9 +98,7 @@ class ObserveHandler:
             )
 
         # Generate selectors for all elements
-        elements_with_selectors = await self._add_selectors_to_elements(
-            elements, selector_map, use_accessibility_tree
-        )
+        elements_with_selectors = await self._add_selectors_to_elements(elements)
 
         self.logger.info(
             "Found elements", auxiliary={"elements": elements_with_selectors}
@@ -128,61 +113,46 @@ class ObserveHandler:
     async def _add_selectors_to_elements(
         self,
         elements: list[dict[str, Any]],
-        selector_map: dict[str, list[str]],
-        use_accessibility_tree: bool,
     ) -> list[ObserveResult]:
         """
         Add selectors to elements based on their element IDs.
 
         Args:
             elements: list of elements from LLM response
-            selector_map: Mapping of element IDs to selectors
-            use_accessibility_tree: Whether using accessibility tree
 
         Returns:
-            list of elements with selectors added
+            list of elements with selectors added (xpaths)
         """
         result = []
 
         for element in elements:
-            element_id = element.get("elementId")
-            rest = {k: v for k, v in element.items() if k != "elementId"}
+            element_id = element.get("element_id")
+            rest = {k: v for k, v in element.items() if k != "element_id"}
 
-            if use_accessibility_tree:
-                # Generate xpath for element using CDP
+            # Generate xpath for element using CDP
+            self.logger.info(
+                "Getting xpath for element",
+                auxiliary={"elementId": str(element_id)},
+            )
+
+            args = {"backendNodeId": element_id}
+            response = await self.stagehand_page.send_cdp("DOM.resolveNode", args)
+            object_id = response.get("object", {}).get("objectId")
+
+            if not object_id:
                 self.logger.info(
-                    "Getting xpath for element",
-                    auxiliary={"elementId": str(element_id)},
+                    f"Invalid object ID returned for element: {element_id}"
                 )
+                continue
 
-                args = {"backendNodeId": element_id}
-                response = await self.stagehand_page.send_cdp("DOM.resolveNode", args)
-                object_id = response.get("object", {}).get("objectId")
+            # Use our utility function to get the XPath
+            cdp_client = await self.stagehand_page.get_cdp_client()
+            xpath = await get_xpath_by_resolved_object_id(cdp_client, object_id)
 
-                if not object_id:
-                    self.logger.info(
-                        f"Invalid object ID returned for element: {element_id}"
-                    )
-                    continue
+            if not xpath:
+                self.logger.info(f"Empty xpath returned for element: {element_id}")
+                continue
 
-                # Use our utility function to get the XPath
-                cdp_client = await self.stagehand_page.get_cdp_client()
-                xpath = await get_xpath_by_resolved_object_id(cdp_client, object_id)
-
-                if not xpath:
-                    self.logger.info(f"Empty xpath returned for element: {element_id}")
-                    continue
-
-                result.append(ObserveResult(**{**rest, "selector": f"xpath={xpath}"}))
-            else:
-                if str(element_id) in selector_map and selector_map[str(element_id)]:
-                    result.append(
-                        ObserveResult(
-                            **{
-                                **rest,
-                                "selector": f"xpath={selector_map[str(element_id)][0]}",
-                            }
-                        )
-                    )
+            result.append(ObserveResult(**{**rest, "selector": f"xpath={xpath}"}))
 
         return result
