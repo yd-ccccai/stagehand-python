@@ -1,6 +1,9 @@
 from typing import Optional, Union
 
 from playwright.sync_api import CDPSession, Page
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+from stagehand.sync.handlers.observe_handler import ObserveHandler
 
 from ..schemas import (
     ActOptions,
@@ -153,14 +156,27 @@ class SyncStagehandPage:
         server.
         """
         self.ensure_injection()
-        if self._stagehand.env == "LOCAL":
-            self._stagehand.logger.warning(
-                "Local execution of observe is not implemented"
-            )
-            return []
         # Convert string to ObserveOptions if needed
         if isinstance(options, str):
             options = ObserveOptions(instruction=options)
+
+        if self._stagehand.env == "LOCAL":
+            # Create request ID
+            import uuid
+
+            request_id = str(uuid.uuid4())
+
+            # If we don't have an observe handler yet, create one
+            # TODO: revisit passing user_provided_instructions
+            if not hasattr(self, "_observe_handler"):
+                self._observe_handler = ObserveHandler(self, self._stagehand, "")
+
+            # Call local observe implementation
+            result = self._observe_handler.observe(
+                options,
+                request_id,
+            )
+            return result
 
         payload = options.model_dump(exclude_none=True, by_alias=True)
         result = self._stagehand._execute("observe", payload)
@@ -294,6 +310,68 @@ class SyncStagehandPage:
             except Exception as e:
                 self._stagehand.logger.warning(f"Error detaching CDP client: {e}")
         self._cdp_client = None
+
+    def _wait_for_settled_dom(self, timeout_ms: int = None):
+        """
+        Wait for the DOM to settle (stop changing) before proceeding.
+
+        Args:
+            timeout_ms (int, optional): Maximum time to wait in milliseconds.
+                If None, uses the stagehand client's dom_settle_timeout_ms.
+        """
+        try:
+            effective_timeout = timeout_ms or getattr(
+                self._stagehand, "dom_settle_timeout_ms", 30000  # Default 30s
+            )
+
+            # Wait for initial page readiness signals
+            self._page.wait_for_load_state(
+                "domcontentloaded", timeout=effective_timeout
+            )
+            self._page.wait_for_selector("body", timeout=effective_timeout)
+
+            # Set default timeout for the evaluate call, as it doesn't take a direct timeout arg
+            # This is a side effect on the page object.
+            # Playwright Page doesn't have a direct getter for its own default_timeout.
+            # It inherits from context, or uses a playwright-wide default (30s).
+            # We will set it and proceed.
+            self._page.set_default_timeout(effective_timeout)
+
+            try:
+                js_script_for_evaluate = """
+                () => {
+                    return new Promise((resolve, reject) => {
+                        if (typeof window.waitForDomSettle === 'function') {
+                            window.waitForDomSettle().then(resolve).catch(e => {
+                                console.warn('waitForDomSettle promise rejected in page context:', e);
+                                reject(e); // Propagate rejection so Playwright's evaluate can catch it
+                            });
+                        } else {
+                            console.warn('waitForDomSettle is not defined in page context, considering DOM as settled');
+                            resolve(); // Resolve immediately if function not present
+                        }
+                    });
+                }
+                """
+                self._page.evaluate(js_script_for_evaluate)
+            finally:
+                # Attempt to restore a sensible default timeout if possible.
+                # If original_page_default_timeout was None or 0 (no timeout), Playwright uses 30s.
+                # For simplicity, if we don't have a reliable original value, we might reset to Playwright's own default.
+                # However, set_default_timeout(0) means no timeout. The actual default is 30000ms.
+                # This part is tricky without a get_default_timeout().
+                # For now, we'll leave the timeout as set, assuming dom_settle_timeout_ms is acceptable.
+                # If a more robust restoration is needed, Stagehand client could store initial context timeout.
+                pass
+
+        except PlaywrightTimeoutError:
+            self._stagehand.logger.warning(
+                "DOM settle operation timed out, continuing anyway.",
+                extra={"timeout_ms": effective_timeout},
+            )
+        except Exception as e:
+            # Log other errors that might occur
+            self._stagehand.logger.error(f"Error in _wait_for_settled_dom: {e}")
 
     # Forward other Page methods to underlying Playwright page
     def __getattr__(self, name):
