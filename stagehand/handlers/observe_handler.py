@@ -83,7 +83,7 @@ class ObserveHandler:
         observation_response = await observe_inference(
             instruction=instruction,
             tree_elements=output_string,
-            llm_client=self.stagehand.llm_client,
+            llm_client=self.stagehand.llm,
             request_id=request_id,
             user_provided_instructions=self.user_provided_instructions,
             logger=self.logger,

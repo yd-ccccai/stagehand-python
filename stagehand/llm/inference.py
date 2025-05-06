@@ -4,12 +4,19 @@ import json
 import time
 from typing import Any, Callable, Optional
 
-import litellm
+from pydantic import BaseModel
 
 from stagehand.llm.prompts import (
     build_observe_system_prompt,
     build_observe_user_message,
 )
+
+
+class ObserveInference(BaseModel):
+    elements: list[str]
+    description: str
+    method: str
+    arguments: list[str]
 
 
 # TODO: kwargs
@@ -55,40 +62,39 @@ async def observe(
     )
 
     # Prepare the schema for the response
-    element_schema = {
-        "elementId": "number",
-        "description": "string",
-    }
+    # element_schema = {
+    #     "elementId": "number",
+    #     "description": "string",
+    # }
 
-    if return_action:
-        element_schema.update(
-            {
-                "method": "string",
-                "arguments": ["string"],
-            }
-        )
+    # if return_action:
+    #     element_schema.update(
+    #         {
+    #             "method": "string",
+    #             "arguments": ["string"],
+    #         }
+    #     )
 
-    schema = {"elements": [element_schema]}
+    # schema = {"elements": [element_schema]}
 
-    response_format = {"type": "json_object", "schema": schema}
+    # response_format = {"type": "json_object", "schema": schema}
 
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
+        system_prompt,
+        user_prompt,
     ]
 
     start_time = time.time()
 
     try:
         # Call the LLM
-        response = await litellm.acompletion(
-            model=llm_client.model_name,
+        response = llm_client.create_response(
+            model=llm_client.default_model,
             messages=messages,
-            response_format=response_format,
+            response_format=ObserveInference,
             temperature=0.1,
             request_id=request_id,
         )
-
         inference_time_ms = int((time.time() - start_time) * 1000)
 
         # Extract token counts
@@ -97,6 +103,7 @@ async def observe(
 
         # Parse the response
         content = response.choices[0].message.content
+        logger.info(f"Response: {content}")
         if isinstance(content, str):
             try:
                 parsed_response = json.loads(content)
