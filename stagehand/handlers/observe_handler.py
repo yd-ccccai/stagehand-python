@@ -55,7 +55,7 @@ class ObserveHandler:
 
         if not from_act:
             self.logger.info(
-                f"Starting observation for task: {instruction}",
+                f"Starting observation for task: '{instruction}'",
                 category="observe",
             )
 
@@ -102,7 +102,7 @@ class ObserveHandler:
         # Generate selectors for all elements
         elements_with_selectors = await self._add_selectors_to_elements(elements)
 
-        self.logger.info(
+        self.logger.debug(
             "Found elements", auxiliary={"elements": elements_with_selectors}
         )
 

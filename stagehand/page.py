@@ -175,13 +175,13 @@ class StagehandPage:
         elif options is None:
             options = ObserveOptions()
 
+        # Otherwise use API implementation
+        payload = options.model_dump(exclude_none=True, by_alias=True)
         # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
-            # Create request ID
-            import uuid
-
-            request_id = str(uuid.uuid4())
-
+            self._stagehand.logger.debug(
+                "observe", category="observe", auxiliary=payload
+            )
             # If we don't have an observe handler yet, create one
             # TODO: revisit passing user_provided_instructions
             if not hasattr(self, "_observe_handler"):
@@ -190,13 +190,11 @@ class StagehandPage:
             # Call local observe implementation
             result = await self._observe_handler.observe(
                 options,
-                request_id,
+                "request_id",
             )
 
             return result
 
-        # Otherwise use API implementation
-        payload = options.model_dump(exclude_none=True, by_alias=True)
         lock = self._stagehand._get_lock_for_session()
         async with lock:
             result = await self._stagehand._execute("observe", payload)

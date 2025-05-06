@@ -28,7 +28,7 @@ class ActHandler:
         """
         action_task = options.get("action")
         self.logger.info(
-            "Starting action for task: {action_task}",
+            f"Starting action for task: '{action_task}'",
             category="act",
         )
         prompt = build_act_observe_prompt(
