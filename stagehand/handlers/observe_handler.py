@@ -31,7 +31,8 @@ class ObserveHandler:
     async def observe(
         self,
         options: ObserveOptions,
-        request_id: str,
+        *request_id: str,
+        from_act: bool = False,
     ) -> list[ObserveResult]:
         """
         Execute an observation operation locally.
@@ -52,11 +53,11 @@ class ObserveHandler:
                 "multiple elements that may be relevant for future actions, return all of them."
             )
 
-        self.logger.info(
-            "Starting observation",
-            category="observe",
-            auxiliary={"instruction": instruction},
-        )
+        if not from_act:
+            self.logger.info(
+                f"Starting observation for task: {instruction}",
+                category="observe",
+            )
 
         # Get DOM representation
         output_string = ""
@@ -77,7 +78,6 @@ class ObserveHandler:
             request_id=request_id,
             user_provided_instructions=self.user_provided_instructions,
             logger=self.logger,
-            return_action=options.return_action,
             log_inference_to_file=False,  # TODO: Implement logging to file if needed
             from_act=False,
         )

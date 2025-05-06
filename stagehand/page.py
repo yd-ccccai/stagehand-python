@@ -2,6 +2,7 @@ from typing import Optional, Union
 
 from playwright.async_api import CDPSession, Page
 
+from stagehand.handlers.act_handler import ActHandler
 from stagehand.handlers.observe_handler import ObserveHandler
 
 from .schemas import (
@@ -115,9 +116,6 @@ class StagehandPage:
             ActResult: The result from the Stagehand server's action execution.
         """
         await self.ensure_injection()
-        if self._stagehand.env == "LOCAL":
-            self._stagehand.logger.warning("Local execution of act is not implemented")
-            return None
         # Check if options is an ObserveResult with both selector and method
         if (
             isinstance(options, ObserveResult)
@@ -134,6 +132,18 @@ class StagehandPage:
         # Otherwise, it should be an ActOptions object
         else:
             payload = options.model_dump(exclude_none=True, by_alias=True)
+
+        # TODO: Temporary until we move api based logic to client
+        if self._stagehand.env == "LOCAL":
+            # TODO: revisit passing user_provided_instructions
+            if not hasattr(self, "_observe_handler"):
+                # TODO: revisit handlers initialization on page creation
+                self._observe_handler = ObserveHandler(self, self._stagehand, "")
+            if not hasattr(self, "_act_handler"):
+                self._act_handler = ActHandler(self, self._stagehand, "")
+            self._stagehand.logger.debug("act", category="act", auxiliary=payload)
+            result = await self._act_handler.act(payload)
+            return result
 
         lock = self._stagehand._get_lock_for_session()
         async with lock:
