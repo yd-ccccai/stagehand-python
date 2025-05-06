@@ -1,6 +1,7 @@
 from .agent import Agent
 from .client import Stagehand
 from .config import StagehandConfig
+from .handlers.observe_handler import ObserveHandler
 from .page import StagehandPage
 from .schemas import (
     ActOptions,
@@ -36,4 +37,6 @@ __all__ = [
     "AgentExecuteOptions",
     "AgentExecuteResult",
     "AgentProvider",
+    "ObserveHandler",
+    "observe",
 ]

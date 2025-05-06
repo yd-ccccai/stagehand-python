@@ -150,13 +150,6 @@ class Stagehand(StagehandBase):
             verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
         )
 
-        # Instantiate the LLM client
-        self.llm = LLMClient(
-            api_key=self.model_api_key,
-            default_model=self.model_name,
-            **self.model_client_options,
-        )
-
         self.httpx_client = httpx_client
         self.timeout_settings = timeout_settings or httpx.Timeout(
             connect=180.0,
@@ -178,6 +171,15 @@ class Stagehand(StagehandBase):
 
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
+
+        # Setup LLM client if LOCAL mode
+        self.llm = None
+        if self.env == "LOCAL":
+            self.llm = LLMClient(
+                api_key=self.model_api_key,
+                default_model=self.model_name,
+                **self.model_client_options,
+            )
 
     def _get_lock_for_session(self) -> asyncio.Lock:
         """
