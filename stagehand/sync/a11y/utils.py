@@ -1,9 +1,11 @@
 import json
 import re
 import time
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
-from stagehand.sync.page import SyncStagehandPage
+if TYPE_CHECKING:
+    from stagehand.sync.page import SyncStagehandPage
+
 from stagehand.types.a11y import (
     AccessibilityNode,
     AXNode,
@@ -16,7 +18,7 @@ from ...utils import StagehandLogger, format_simplified_tree
 
 def _clean_structural_nodes(
     node: AccessibilityNode,
-    page: Optional[SyncStagehandPage],
+    page: Optional["SyncStagehandPage"],
     logger: Optional[StagehandLogger],
 ) -> Optional[AccessibilityNode]:
     """Helper function to remove or collapse unnecessary structural nodes."""
@@ -122,7 +124,7 @@ def _extract_url_from_ax_node(
 
 def build_hierarchical_tree(
     nodes: list[AXNode],
-    page: Optional[SyncStagehandPage],
+    page: Optional["SyncStagehandPage"],
     logger: Optional[StagehandLogger],
 ) -> TreeResult:
     """Builds a hierarchical tree structure from a flat array of accessibility nodes."""
@@ -219,7 +221,7 @@ def build_hierarchical_tree(
 
 
 def get_accessibility_tree(
-    page: SyncStagehandPage,
+    page: "SyncStagehandPage",
     logger: StagehandLogger,
 ) -> TreeResult:
     """Retrieves the full accessibility tree via CDP and transforms it."""
@@ -347,7 +349,7 @@ def get_xpath_by_resolved_object_id(
         return ""
 
 
-def find_scrollable_element_ids(stagehand_page: SyncStagehandPage) -> set[int]:
+def find_scrollable_element_ids(stagehand_page: "SyncStagehandPage") -> set[int]:
     """Identifies backendNodeIds of scrollable elements in the DOM."""
     # Ensure getScrollableElementXpaths is defined in the page context
     try:

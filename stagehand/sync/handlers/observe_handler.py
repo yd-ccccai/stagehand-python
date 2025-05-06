@@ -2,9 +2,12 @@
 
 from typing import Any
 
-from stagehand.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
 from stagehand.llm.inference import observe as observe_inference
 from stagehand.schemas import ObserveOptions, ObserveResult
+from stagehand.sync.a11y.utils import (
+    get_accessibility_tree,
+    get_xpath_by_resolved_object_id,
+)
 from stagehand.utils import draw_observe_overlay
 
 
@@ -28,7 +31,7 @@ class ObserveHandler:
         self.user_provided_instructions = user_provided_instructions
 
     # TODO: better kwargs
-    async def observe(
+    def observe(
         self,
         options: ObserveOptions,
         request_id: str,
@@ -62,9 +65,11 @@ class ObserveHandler:
         output_string = ""
         iframes = []
 
-        await self.stagehand_page._wait_for_settled_dom()
+        self.stagehand_page._wait_for_settled_dom()
+        # TODO: temporary while we define the sync version of _wait_for_settled_dom
+        # self.stagehand_page.wait_for_load_state("domcontentloaded")
         # Get accessibility tree data using our utility function
-        tree = await get_accessibility_tree(self.stagehand_page, self.logger)
+        tree = get_accessibility_tree(self.stagehand_page, self.logger)
         self.logger.info("Getting accessibility tree data")
         output_string = tree["simplified"]
         iframes = tree.get("iframes", [])
@@ -100,7 +105,7 @@ class ObserveHandler:
             )
 
         # Generate selectors for all elements
-        elements_with_selectors = await self._add_selectors_to_elements(elements)
+        elements_with_selectors = self._add_selectors_to_elements(elements)
 
         self.logger.info(
             "Found elements", auxiliary={"elements": elements_with_selectors}
@@ -108,11 +113,11 @@ class ObserveHandler:
 
         # Draw overlay if requested
         if options.draw_overlay:
-            await draw_observe_overlay(self.stagehand_page, elements_with_selectors)
+            draw_observe_overlay(self.stagehand_page, elements_with_selectors)
 
         return elements_with_selectors
 
-    async def _add_selectors_to_elements(
+    def _add_selectors_to_elements(
         self,
         elements: list[dict[str, Any]],
     ) -> list[ObserveResult]:
@@ -140,7 +145,7 @@ class ObserveHandler:
 
             args = {"backendNodeId": element_id}
             print(args)
-            response = await self.stagehand_page.send_cdp("DOM.resolveNode", args)
+            response = self.stagehand_page.send_cdp("DOM.resolveNode", args)
             object_id = response.get("object", {}).get("objectId")
 
             if not object_id:
@@ -150,8 +155,8 @@ class ObserveHandler:
                 continue
 
             # Use our utility function to get the XPath
-            cdp_client = await self.stagehand_page.get_cdp_client()
-            xpath = await get_xpath_by_resolved_object_id(cdp_client, object_id)
+            cdp_client = self.stagehand_page.get_cdp_client()
+            xpath = get_xpath_by_resolved_object_id(cdp_client, object_id)
 
             if not xpath:
                 self.logger.info(f"Empty xpath returned for element: {element_id}")

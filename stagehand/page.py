@@ -167,7 +167,6 @@ class StagehandPage:
 
         # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
-            # Import here to avoid circular imports
             # Create request ID
             import uuid
 
@@ -175,13 +174,11 @@ class StagehandPage:
 
             # If we don't have an observe handler yet, create one
             # TODO: revisit passing user_provided_instructions
-            if not hasattr(self._stagehand, "_observe_handler"):
-                self._stagehand._observe_handler = ObserveHandler(
-                    self, self._stagehand, ""
-                )
+            if not hasattr(self, "_observe_handler"):
+                self._observe_handler = ObserveHandler(self, self._stagehand, "")
 
             # Call local observe implementation
-            result = await self._stagehand._observe_handler.observe(
+            result = await self._observe_handler.observe(
                 options,
                 request_id,
             )
