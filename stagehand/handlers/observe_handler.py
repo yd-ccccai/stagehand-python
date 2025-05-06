@@ -26,6 +26,7 @@ class ObserveHandler:
         self.logger = stagehand_client.logger
         self.user_provided_instructions = user_provided_instructions
 
+    # TODO: better kwargs
     async def observe(
         self,
         options: ObserveOptions,

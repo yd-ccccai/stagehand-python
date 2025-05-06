@@ -12,6 +12,7 @@ from stagehand.types import (
     ObserveInferenceSchema,
 )
 
+
 # TODO: kwargs
 async def observe(
     instruction: str,
