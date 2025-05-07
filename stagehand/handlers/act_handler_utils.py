@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 from playwright.async_api import Locator, Page
 
+
 @dataclass
 class MethodHandlerContext:
     method: str

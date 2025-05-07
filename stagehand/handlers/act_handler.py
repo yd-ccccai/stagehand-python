@@ -36,7 +36,7 @@ class ActHandler:
         if "selector" in options and "method" in options:
             options = ObserveResult(**options)
             return await self._act_from_observe_result(options)
-        
+
         action_task = options.get("action")
         self.logger.info(
             f"Starting action for task: '{action_task}'",
@@ -136,17 +136,17 @@ class ActHandler:
             or f"ObserveResult action ({observe_result.method})"
         )
         try:
-          await self._perform_playwright_method(
-              method=observe_result.method,
-              args=observe_result.arguments or [],
-              xpath=observe_result.selector.replace("xpath=", ""),
-          )
-          return ActResult(
-              success=True,
-              message=f"Action [{observe_result.method}] performed successfully on selector: {observe_result.selector}",
-              action=observe_result.description
-              or f"ObserveResult action ({observe_result.method})",
-          )
+            await self._perform_playwright_method(
+                method=observe_result.method,
+                args=observe_result.arguments or [],
+                xpath=observe_result.selector.replace("xpath=", ""),
+            )
+            return ActResult(
+                success=True,
+                message=f"Action [{observe_result.method}] performed successfully on selector: {observe_result.selector}",
+                action=observe_result.description
+                or f"ObserveResult action ({observe_result.method})",
+            )
         except Exception as e:
             self.logger.error(
                 message=f"{str(e)}",
