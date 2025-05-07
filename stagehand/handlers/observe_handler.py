@@ -127,7 +127,6 @@ class ObserveHandler:
         """
         result = []
 
-        print(elements)
         for element in elements:
             element_id = element.get("element_id")
             rest = {k: v for k, v in element.items() if k != "element_id"}
@@ -139,7 +138,6 @@ class ObserveHandler:
             )
 
             args = {"backendNodeId": element_id}
-            print(args)
             response = await self.stagehand_page.send_cdp("DOM.resolveNode", args)
             object_id = response.get("object", {}).get("objectId")
 

@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 class ObserveElementSchema(BaseModel):
     element_id: int
-    description: str
+    description: str = Field(
+        ..., description="A description of the observed element and its purpose."
+    )
     method: str
     arguments: list[str]
 
