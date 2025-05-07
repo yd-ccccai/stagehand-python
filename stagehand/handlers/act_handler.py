@@ -42,7 +42,9 @@ class ActHandler:
         """
         if "selector" in options and "method" in options:
             options = ObserveResult(**options)
-            return await self._act_from_observe_result(options)
+            return await self._act_from_observe_result(
+                options, self.stagehand.dom_settle_timeout_ms
+            )
 
         action_task = options.get("action")
         self.logger.info(
@@ -233,7 +235,7 @@ class ActHandler:
                 return await self.stagehand_page.act(act_command)
             except Exception as fallback_e:
                 self.logger.error(
-                    message=f"Error performing act from an ObserveResult on fallback self-heal attempt: {str(fallback_e)}",
+                    message=f"Error performing act on fallback self-heal attempt: {str(fallback_e)}",
                     category="act",
                     auxiliary={
                         "exception": str(fallback_e),
