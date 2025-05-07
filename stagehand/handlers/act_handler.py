@@ -159,6 +159,10 @@ class ActHandler:
             observe_result.description
             or f"ObserveResult action ({observe_result.method})"
         )
+        self.logger.info(
+            message=f"Attempting to perform action: {action_description}",
+            category="act",
+        )
         try:
             await self._perform_playwright_method(
                 method=observe_result.method,
