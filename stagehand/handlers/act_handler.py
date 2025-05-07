@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from stagehand.handlers.act_handler_utils import (
     MethodHandlerContext,
@@ -28,11 +28,15 @@ class ActHandler:
         self.logger = stagehand_client.logger
         self.user_provided_instructions = user_provided_instructions
 
-    async def act(self, options: ActOptions) -> ActResult:
+    async def act(self, options: Union[ActOptions, ObserveResult]) -> ActResult:
         """
         Perform an act based on an instruction.
         This method will observe the page and then perform the act on the first element returned.
         """
+        if "selector" in options and "method" in options:
+            options = ObserveResult(**options)
+            return await self._act_from_observe_result(options)
+        
         action_task = options.get("action")
         self.logger.info(
             f"Starting action for task: '{action_task}'",
@@ -40,7 +44,7 @@ class ActHandler:
         )
         prompt = build_act_observe_prompt(
             action=action_task,
-            supported_actions=list(method_handler_map.keys()),  # Use keys from the map
+            supported_actions=list(method_handler_map.keys()),
             variables=options.get("variables"),
         )
 
@@ -131,18 +135,29 @@ class ActHandler:
             observe_result.description
             or f"ObserveResult action ({observe_result.method})"
         )
-        self.logger.warning(
-            message="Self-healing part of _act_from_observe_result is not implemented in this version.",
-            category="act",
-        )
+        try:
+          await self._perform_playwright_method(
+              method=observe_result.method,
+              args=observe_result.arguments or [],
+              xpath=observe_result.selector.replace("xpath=", ""),
+          )
+          return ActResult(
+              success=True,
+              message=f"Action [{observe_result.method}] performed successfully on selector: {observe_result.selector}",
+              action=observe_result.description
+              or f"ObserveResult action ({observe_result.method})",
+          )
+        except Exception as e:
+            self.logger.error(
+                message=f"{str(e)}",
+            )
+            return ActResult(
+                success=False,
+                message=f"Failed to perform act: {str(e)}",
+                action=action_description,
+            )
         # This would typically attempt the action, catch errors, and then potentially call
         # self.stagehand_page.act(...) with the original instruction for self-healing.
-        # Since the primary action attempt is now in `act()`, this method is more of a stub.
-        return ActResult(
-            success=False,
-            message="Self-healing not implemented",
-            action=action_description,
-        )
 
     async def _perform_playwright_method(
         self,
