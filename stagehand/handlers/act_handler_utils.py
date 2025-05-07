@@ -9,10 +9,6 @@ if TYPE_CHECKING:
 from playwright.async_api import Locator, Page
 
 
-class PlaywrightCommandException(Exception):
-    pass
-
-
 class StagehandClickError(Exception):
     pass
 
@@ -25,17 +21,16 @@ class MethodHandlerContext:
     args: list[Any]
     stagehand_page: "StagehandPage"
     initial_url: str
-    logger: Optional[Callable] = None
+    logger: Callable = None
     dom_settle_timeout_ms: Optional[int] = None
 
 
 async def scroll_to_next_chunk(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.debug(
-            message="scrolling to next chunk",
-            category="action",
-            auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
-        )
+    ctx.logger.debug(
+        message="scrolling to next chunk",
+        category="action",
+        auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
+    )
     try:
         await ctx.stagehand_page._page.evaluate(
             """
@@ -98,29 +93,26 @@ async def scroll_to_next_chunk(ctx: MethodHandlerContext) -> None:
             {"xpath": ctx.xpath},
         )
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error scrolling to next chunk",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
+        ctx.logger.error(
+            message="error scrolling to next chunk",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+            },
+        )
 
 
 async def scroll_to_previous_chunk(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.debug(
-            message="scrolling to previous chunk",
-            category="action",
-            auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
-        )
+    ctx.logger.debug(
+        message="scrolling to previous chunk",
+        category="action",
+        auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
+    )
     try:
         await ctx.stagehand_page._page.evaluate(
             """
@@ -181,60 +173,54 @@ async def scroll_to_previous_chunk(ctx: MethodHandlerContext) -> None:
             {"xpath": ctx.xpath},
         )
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error scrolling to previous chunk",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
+        ctx.logger.error(
+            message="error scrolling to previous chunk",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+            },
+        )
 
 
 async def scroll_element_into_view(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.debug(
-            message="scrolling element into view",
-            category="action",
-            auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
-        )
+    ctx.logger.debug(
+        message="scrolling element into view",
+        category="action",
+        auxiliary={"xpath": {"value": ctx.xpath, "type": "string"}},
+    )
     try:
         await ctx.locator.evaluate(
             "(element) => { element.scrollIntoView({ behavior: 'smooth', block: 'center' }); }"
         )
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error scrolling element into view",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
+        ctx.logger.error(
+            message="error scrolling element into view",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+            },
+        )
 
 
 async def scroll_element_to_percentage(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.debug(
-            message="scrolling element vertically to specified percentage",
-            category="action",
-            auxiliary={
-                "xpath": {"value": ctx.xpath, "type": "string"},
-                "coordinate": {"value": json.dumps(ctx.args), "type": "string"},
-            },
-        )
+    ctx.logger.debug(
+        message="scrolling element vertically to specified percentage",
+        category="action",
+        auxiliary={
+            "xpath": {"value": ctx.xpath, "type": "string"},
+            "coordinate": {"value": json.dumps(ctx.args), "type": "string"},
+        },
+    )
     try:
         y_arg = ctx.args[0] if ctx.args else "0%"
         await ctx.stagehand_page._page.evaluate(
@@ -282,21 +268,19 @@ async def scroll_element_to_percentage(ctx: MethodHandlerContext) -> None:
             {"xpath": ctx.xpath, "yArg": y_arg},
         )
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error scrolling element vertically to percentage",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
-                    "args": {"value": json.dumps(ctx.args), "type": "object"},
+        ctx.logger.error(
+            message="error scrolling element vertically to percentage",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+                "args": {"value": json.dumps(ctx.args), "type": "object"},
+            },
+        )
 
 
 async def fill_or_type(ctx: MethodHandlerContext) -> None:
@@ -305,20 +289,18 @@ async def fill_or_type(ctx: MethodHandlerContext) -> None:
         text = str(ctx.args[0]) if ctx.args and ctx.args[0] is not None else ""
         await ctx.locator.fill(text, force=True)
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error filling element",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
+        ctx.logger.error(
+            message="error filling element",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+            },
+        )
 
 
 async def press_key(ctx: MethodHandlerContext) -> None:
@@ -334,27 +316,25 @@ async def press_key(ctx: MethodHandlerContext) -> None:
             ctx.dom_settle_timeout_ms,
         )
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error pressing key",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "key": {
-                        "value": (
-                            str(ctx.args[0])
-                            if ctx.args and ctx.args[0] is not None
-                            else "unknown"
-                        ),
-                        "type": "string",
-                    },
+        ctx.logger.error(
+            message="error pressing key",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "key": {
+                    "value": (
+                        str(ctx.args[0])
+                        if ctx.args and ctx.args[0] is not None
+                        else "unknown"
+                    ),
+                    "type": "string",
+                },
+            },
+        )
 
 
 async def click_element(ctx: MethodHandlerContext) -> None:
@@ -370,22 +350,20 @@ async def click_element(ctx: MethodHandlerContext) -> None:
         # Using JavaScript click to be consistent with the TS version
         await ctx.locator.evaluate("(el) => el.click()")
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error performing click",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
-                    "method": {"value": "click", "type": "string"},
-                    "args": {"value": json.dumps(ctx.args), "type": "object"},
+        ctx.logger.error(
+            message="error performing click",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise StagehandClickError(ctx.xpath, str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+                "method": {"value": "click", "type": "string"},
+                "args": {"value": json.dumps(ctx.args), "type": "object"},
+            },
+        )
 
     await handle_possible_page_navigation(
         "click",
@@ -398,34 +376,31 @@ async def click_element(ctx: MethodHandlerContext) -> None:
 
 
 async def fallback_locator_method(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.debug(
-            message="page URL before action",
-            category="action",
-            auxiliary={"url": {"value": ctx.locator._page.url, "type": "string"}},
-        )
+    ctx.logger.debug(
+        message="page URL before action",
+        category="action",
+        auxiliary={"url": {"value": ctx.locator._page.url, "type": "string"}},
+    )
     try:
         method_to_call = getattr(ctx.locator, ctx.method)
         # Convert args to strings, handling None
         str_args = [str(arg) if arg is not None else "" for arg in ctx.args]
         await method_to_call(*str_args)
     except Exception as e:
-        if ctx.logger:
-            ctx.logger.error(
-                message="error performing method",
-                category="action",
-                auxiliary={
-                    "error": {"value": str(e), "type": "string"},
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "xpath": {"value": ctx.xpath, "type": "string"},
-                    "method": {"value": ctx.method, "type": "string"},
-                    "args": {"value": json.dumps(ctx.args), "type": "object"},
+        ctx.logger.error(
+            message="error performing method",
+            category="action",
+            auxiliary={
+                "error": {"value": str(e), "type": "string"},
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
                 },
-            )
-        raise PlaywrightCommandException(str(e))
+                "xpath": {"value": ctx.xpath, "type": "string"},
+                "method": {"value": ctx.method, "type": "string"},
+                "args": {"value": json.dumps(ctx.args), "type": "object"},
+            },
+        )
 
 
 async def handle_possible_page_navigation(
@@ -433,15 +408,15 @@ async def handle_possible_page_navigation(
     xpath: str,
     initial_url: str,
     stagehand_page: "StagehandPage",
-    logger: Optional[Callable] = None,
+    logger: Callable = None,
     dom_settle_timeout_ms: Optional[int] = None,
 ) -> None:
-    if logger:
-        logger.debug(
-            message=f"{action_description}, checking for page navigation",
-            category="action",
-            auxiliary={"xpath": {"value": xpath, "type": "string"}},
-        )
+
+    logger.debug(
+        message=f"{action_description}, checking for page navigation",
+        category="action",
+        auxiliary={"xpath": {"value": xpath, "type": "string"}},
+    )
 
     # TODO: check for stagehand_page
     new_opened_tab: Optional[Page] = None
@@ -457,7 +432,6 @@ async def handle_possible_page_navigation(
     except Exception:
         new_opened_tab = None
 
-    if logger:
         logger.debug(
             message=f"{action_description} complete",
             category="action",
@@ -472,12 +446,11 @@ async def handle_possible_page_navigation(
         )
 
     if new_opened_tab:
-        if logger:
-            logger.info(
-                message="new page detected (new tab) with URL",
-                category="action",
-                auxiliary={"url": {"value": new_opened_tab.url, "type": "string"}},
-            )
+        logger.info(
+            message="new page detected (new tab) with URL",
+            category="action",
+            auxiliary={"url": {"value": new_opened_tab.url, "type": "string"}},
+        )
         new_tab_url = new_opened_tab.url
         await new_opened_tab.close()
         await stagehand_page._page.goto(new_tab_url)
@@ -486,34 +459,29 @@ async def handle_possible_page_navigation(
     try:
         await stagehand_page._wait_for_settled_dom(dom_settle_timeout_ms)
     except Exception as e:
-        if logger:
-            logger.warning(
-                message="wait for settled DOM timeout hit",
-                category="action",
-                auxiliary={
-                    "trace": {
-                        "value": getattr(e, "__traceback__", ""),
-                        "type": "string",
-                    },
-                    "message": {"value": str(e), "type": "string"},
-                },
-            )
-
-    if logger:
-        logger.debug(
-            message="finished waiting for (possible) page navigation",
+        logger.warning(
+            message="wait for settled DOM timeout hit",
             category="action",
+            auxiliary={
+                "trace": {
+                    "value": getattr(e, "__traceback__", ""),
+                    "type": "string",
+                },
+                "message": {"value": str(e), "type": "string"},
+            },
         )
 
+    logger.debug(
+        message="finished waiting for (possible) page navigation",
+        category="action",
+    )
+
     if stagehand_page._page.url != initial_url:
-        if logger:
-            logger.info(
-                message="new page detected with URL",
-                category="action",
-                auxiliary={
-                    "url": {"value": stagehand_page._page.url, "type": "string"}
-                },
-            )
+        logger.info(
+            message="new page detected with URL",
+            category="action",
+            auxiliary={"url": {"value": stagehand_page._page.url, "type": "string"}},
+        )
 
 
 method_handler_map: dict[
@@ -528,9 +496,7 @@ method_handler_map: dict[
     # This might need a page.mouse.wheel(x, y) or evaluate.
     # For now, mapping to scroll percentage as in TS.
     "fill": fill_or_type,
-    "type": (
-        fill_or_type
-    ),  # Playwright Python's type often appends. Fill is usually safer for replacement.
+    "type": fill_or_type,
     "press": press_key,
     "click": click_element,
     "nextChunk": scroll_to_next_chunk,

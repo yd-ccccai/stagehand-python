@@ -10,11 +10,6 @@ from stagehand.llm.prompts import build_act_observe_prompt
 from stagehand.types import ActOptions, ActResult, ObserveOptions, ObserveResult
 
 
-class PlaywrightCommandMethodNotSupportedException(PlaywrightCommandException):
-    """Custom exception for unsupported Playwright methods."""
-    pass
-
-
 class ActHandler:
     """Handler for processing observe operations locally."""
 
@@ -193,9 +188,6 @@ class ActHandler:
                     message="chosen method is invalid",
                     category="act",
                     auxiliary={"method": {"value": method, "type": "string"}},
-                )
-                raise PlaywrightCommandMethodNotSupportedException(
-                    f"Method {method} not supported"
                 )
 
             await self.stagehand_page._wait_for_settled_dom(dom_settle_timeout_ms)
