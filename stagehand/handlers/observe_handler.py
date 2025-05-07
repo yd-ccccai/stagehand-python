@@ -65,8 +65,8 @@ class ObserveHandler:
 
         await self.stagehand_page._wait_for_settled_dom()
         # Get accessibility tree data using our utility function
-        tree = await get_accessibility_tree(self.stagehand_page, self.logger)
         self.logger.info("Getting accessibility tree data")
+        tree = await get_accessibility_tree(self.stagehand_page, self.logger)
         output_string = tree["simplified"]
         iframes = tree.get("iframes", [])
 

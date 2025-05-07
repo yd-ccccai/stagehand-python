@@ -339,7 +339,7 @@ async def press_key(ctx: MethodHandlerContext) -> None:
 
 async def click_element(ctx: MethodHandlerContext) -> None:
     if ctx.logger:
-        ctx.logger.debug(
+        ctx.logger.info(
             message="page URL before click",
             category="action",
             auxiliary={
@@ -412,7 +412,7 @@ async def handle_possible_page_navigation(
     dom_settle_timeout_ms: Optional[int] = None,
 ) -> None:
 
-    logger.debug(
+    logger.info(
         message=f"{action_description}, checking for page navigation",
         category="action",
         auxiliary={"xpath": {"value": xpath, "type": "string"}},
@@ -432,7 +432,7 @@ async def handle_possible_page_navigation(
     except Exception:
         new_opened_tab = None
 
-        logger.debug(
+        logger.info(
             message=f"{action_description} complete",
             category="action",
             auxiliary={
@@ -471,7 +471,7 @@ async def handle_possible_page_navigation(
             },
         )
 
-    logger.debug(
+    logger.info(
         message="finished waiting for (possible) page navigation",
         category="action",
     )

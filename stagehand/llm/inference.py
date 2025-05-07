@@ -60,6 +60,7 @@ def observe(
 
     try:
         # Call the LLM
+        logger.info("Calling LLM")
         response = llm_client.create_response(
             model=llm_client.default_model,
             messages=messages,
