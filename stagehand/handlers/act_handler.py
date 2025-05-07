@@ -2,7 +2,6 @@ from typing import Any, Optional
 
 from stagehand.handlers.act_handler_utils import (
     MethodHandlerContext,
-    PlaywrightCommandException,
     fallback_locator_method,
     method_handler_map,
 )
@@ -195,6 +194,3 @@ class ActHandler:
             self.logger.error(
                 message=f"{str(e)}",
             )
-            if not isinstance(e, PlaywrightCommandException):
-                raise PlaywrightCommandException(str(e)) from e
-            raise

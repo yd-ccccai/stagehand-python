@@ -98,7 +98,7 @@ async def main():
         model_name="gemini/gemini-2.5-flash-preview-04-17",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
         # Use verbose=2 for medium-detail logs (1=minimal, 3=debug)
-        verbose=2,
+        verbose=3,
     )
 
     stagehand = Stagehand(
