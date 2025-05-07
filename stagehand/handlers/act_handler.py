@@ -1,5 +1,5 @@
-from typing import Any, Optional, Union
 import traceback
+from typing import Any, Optional, Union
 
 from stagehand.handlers.act_handler_utils import (
     MethodHandlerContext,
@@ -139,11 +139,15 @@ class ActHandler:
                 category="act",
                 auxiliary={
                     "error": {
-                        "value": "NotSupportedError: The method requested in this ObserveResult is not supported by Stagehand.",
+                        "value": (
+                            "NotSupportedError: The method requested in this ObserveResult is not supported by Stagehand."
+                        ),
                         "type": "string",
                     },
                     "trace": {
-                        "value": f"Cannot execute act from ObserveResult with unsupported method: {observe_result.method}",
+                        "value": (
+                            f"Cannot execute act from ObserveResult with unsupported method: {observe_result.method}"
+                        ),
                         "type": "string",
                     },
                 },
@@ -189,15 +193,6 @@ class ActHandler:
                     action=action_description,
                 )
 
-            self.logger.info(
-                message="Error performing act from an ObserveResult. Reprocessing the page and trying again.",
-                category="act",
-                auxiliary={
-                    "original_error": str(e),
-                    "observe_result": observe_result.model_dump_json() if hasattr(observe_result, "model_dump_json") else str(observe_result),
-                },
-            )
-
             # Construct act_command for self-heal
             method_name = observe_result.method
             current_description = observe_result.description or ""
@@ -208,12 +203,20 @@ class ActHandler:
                 act_command = f"{method_name} {current_description}".strip()
             else:  # method_name is None or empty
                 act_command = current_description
-            
-            if not act_command: # If both method and description were empty or resulted in an empty command
+
+            if (
+                not act_command
+            ):  # If both method and description were empty or resulted in an empty command
                 self.logger.warning(
                     "Self-heal attempt aborted: could not construct a valid command from ObserveResult.",
                     category="act",
-                    auxiliary={"observe_result": observe_result.model_dump_json() if hasattr(observe_result, "model_dump_json") else str(observe_result)}
+                    auxiliary={
+                        "observe_result": (
+                            observe_result.model_dump_json()
+                            if hasattr(observe_result, "model_dump_json")
+                            else str(observe_result)
+                        )
+                    },
                 )
                 return ActResult(
                     success=False,
@@ -232,12 +235,15 @@ class ActHandler:
                 self.logger.error(
                     message=f"Error performing act from an ObserveResult on fallback self-heal attempt: {str(fallback_e)}",
                     category="act",
-                    auxiliary={"exception": str(fallback_e), "stack_trace": traceback.format_exc()},
+                    auxiliary={
+                        "exception": str(fallback_e),
+                        "stack_trace": traceback.format_exc(),
+                    },
                 )
                 return ActResult(
                     success=False,
                     message=f"Failed to perform act on fallback: {str(fallback_e)}",
-                    action=action_description, # Original action description
+                    action=action_description,  # Original action description
                 )
 
     async def _perform_playwright_method(
@@ -290,3 +296,4 @@ class ActHandler:
             self.logger.error(
                 message=f"{str(e)}",
             )
+            raise e

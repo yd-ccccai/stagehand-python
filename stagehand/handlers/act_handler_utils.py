@@ -339,8 +339,16 @@ async def click_element(ctx: MethodHandlerContext) -> None:
         category="action",
     )
     try:
-        # Using JavaScript click to be consistent with the TS version
+        # Using JavaScript click
         await ctx.locator.evaluate("(el) => el.click()")
+        await handle_possible_page_navigation(
+            "click",
+            ctx.xpath,
+            ctx.initial_url,
+            ctx.stagehand_page,
+            ctx.logger,
+            ctx.dom_settle_timeout_ms,
+        )
     except Exception as e:
         ctx.logger.error(
             message="error performing click",
@@ -356,16 +364,7 @@ async def click_element(ctx: MethodHandlerContext) -> None:
                 "args": {"value": json.dumps(ctx.args), "type": "object"},
             },
         )
-        return e
-
-    await handle_possible_page_navigation(
-        "click",
-        ctx.xpath,
-        ctx.initial_url,
-        ctx.stagehand_page,
-        ctx.logger,
-        ctx.dom_settle_timeout_ms,
-    )
+        raise e
 
 
 async def fallback_locator_method(ctx: MethodHandlerContext) -> None:
