@@ -1,4 +1,5 @@
 from typing import Any, Optional, Union
+import traceback
 
 from stagehand.handlers.act_handler_utils import (
     MethodHandlerContext,
@@ -13,7 +14,11 @@ class ActHandler:
     """Handler for processing observe operations locally."""
 
     def __init__(
-        self, stagehand_page, stagehand_client, user_provided_instructions=None
+        self,
+        stagehand_page,
+        stagehand_client,
+        user_provided_instructions=None,
+        self_heal: bool = True,
     ):
         """
         Initialize the ActHandler.
@@ -22,11 +27,13 @@ class ActHandler:
             stagehand_page: StagehandPage instance
             stagehand_client: Stagehand client instance
             user_provided_instructions: Optional custom system instructions
+            self_heal: Whether to attempt self-healing on failed actions from ObserveResult.
         """
         self.stagehand_page = stagehand_page
         self.stagehand = stagehand_client
         self.logger = stagehand_client.logger
         self.user_provided_instructions = user_provided_instructions
+        self.self_heal = self_heal
 
     async def act(self, options: Union[ActOptions, ObserveResult]) -> ActResult:
         """
@@ -110,13 +117,9 @@ class ActHandler:
             )
 
     async def _act_from_observe_result(
-        self, observe_result: ObserveResult
+        self, observe_result: ObserveResult, dom_settle_timeout_ms: Optional[int] = None
     ) -> ActResult:
-        # This method in the original TypeScript (`actFromObserveResult`) contained logic
-        # for self-healing if an action failed, by re-observing and trying again.
-        # The current `act` method above has been refactored to call `_perform_playwright_method`
-        # directly after the initial observe. To restore self-healing, this method would need
-        # to be fully implemented with that logic, and `act` would call this method.
+
         self.logger.debug(
             message="_act_from_observe_result called",
             category="act",
@@ -125,12 +128,33 @@ class ActHandler:
                     observe_result.model_dump_json()
                     if hasattr(observe_result, "model_dump_json")
                     else str(observe_result)
-                )
+                ),
+                "dom_settle_timeout_ms": dom_settle_timeout_ms,
             },
         )
 
-        # Placeholder: The actual implementation of self-healing would go here.
-        # For now, it just logs and indicates it's not fully implemented to match TS.
+        if observe_result.method == "not-supported":
+            self.logger.warning(
+                message="Cannot execute ObserveResult with unsupported method",
+                category="act",
+                auxiliary={
+                    "error": {
+                        "value": "NotSupportedError: The method requested in this ObserveResult is not supported by Stagehand.",
+                        "type": "string",
+                    },
+                    "trace": {
+                        "value": f"Cannot execute act from ObserveResult with unsupported method: {observe_result.method}",
+                        "type": "string",
+                    },
+                },
+            )
+            return ActResult(
+                success=False,
+                message=f"Unable to perform action: The method '{observe_result.method}' is not supported in ObserveResult. Please use a supported Playwright locator method.",
+                action=observe_result.description
+                or f"ObserveResult action ({observe_result.method})",
+            )
+
         action_description = (
             observe_result.description
             or f"ObserveResult action ({observe_result.method})"
@@ -140,24 +164,77 @@ class ActHandler:
                 method=observe_result.method,
                 args=observe_result.arguments or [],
                 xpath=observe_result.selector.replace("xpath=", ""),
+                dom_settle_timeout_ms=dom_settle_timeout_ms,
             )
             return ActResult(
                 success=True,
                 message=f"Action [{observe_result.method}] performed successfully on selector: {observe_result.selector}",
-                action=observe_result.description
-                or f"ObserveResult action ({observe_result.method})",
+                action=action_description,
             )
         except Exception as e:
             self.logger.error(
-                message=f"{str(e)}",
+                message=f"Error performing act from ObserveResult: {str(e)}",
+                category="act",
+                auxiliary={"exception": str(e), "stack_trace": traceback.format_exc()},
             )
-            return ActResult(
-                success=False,
-                message=f"Failed to perform act: {str(e)}",
-                action=action_description,
+
+            if not self.self_heal:
+                return ActResult(
+                    success=False,
+                    message=f"Failed to perform act: {str(e)}",
+                    action=action_description,
+                )
+
+            self.logger.info(
+                message="Error performing act from an ObserveResult. Reprocessing the page and trying again.",
+                category="act",
+                auxiliary={
+                    "original_error": str(e),
+                    "observe_result": observe_result.model_dump_json() if hasattr(observe_result, "model_dump_json") else str(observe_result),
+                },
             )
-        # This would typically attempt the action, catch errors, and then potentially call
-        # self.stagehand_page.act(...) with the original instruction for self-healing.
+
+            # Construct act_command for self-heal
+            method_name = observe_result.method
+            current_description = observe_result.description or ""
+
+            if current_description.lower().startswith(method_name.lower()):
+                act_command = current_description
+            elif method_name:  # method_name is not None/empty
+                act_command = f"{method_name} {current_description}".strip()
+            else:  # method_name is None or empty
+                act_command = current_description
+            
+            if not act_command: # If both method and description were empty or resulted in an empty command
+                self.logger.warning(
+                    "Self-heal attempt aborted: could not construct a valid command from ObserveResult.",
+                    category="act",
+                    auxiliary={"observe_result": observe_result.model_dump_json() if hasattr(observe_result, "model_dump_json") else str(observe_result)}
+                )
+                return ActResult(
+                    success=False,
+                    message=f"Failed to perform act: {str(e)}. Self-heal aborted due to empty command.",
+                    action=action_description,
+                )
+
+            try:
+                self.logger.info(
+                    f"Attempting self-heal by calling page.act with command: '{act_command}'",
+                    category="act",
+                )
+                # This will go through the full act flow, including a new observe if necessary
+                return await self.stagehand_page.act(act_command)
+            except Exception as fallback_e:
+                self.logger.error(
+                    message=f"Error performing act from an ObserveResult on fallback self-heal attempt: {str(fallback_e)}",
+                    category="act",
+                    auxiliary={"exception": str(fallback_e), "stack_trace": traceback.format_exc()},
+                )
+                return ActResult(
+                    success=False,
+                    message=f"Failed to perform act on fallback: {str(fallback_e)}",
+                    action=action_description, # Original action description
+                )
 
     async def _perform_playwright_method(
         self,

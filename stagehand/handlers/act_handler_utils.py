@@ -334,21 +334,17 @@ async def press_key(ctx: MethodHandlerContext) -> None:
 
 
 async def click_element(ctx: MethodHandlerContext) -> None:
-    if ctx.logger:
-        ctx.logger.info(
-            message="page URL before click",
-            category="action",
-            auxiliary={
-                "url": {"value": ctx.stagehand_page._page.url, "type": "string"}
-            },
-        )
+    ctx.logger.debug(
+        message=f"page URL before click {ctx.stagehand_page._page.url}",
+        category="action",
+    )
     try:
         # Using JavaScript click to be consistent with the TS version
         await ctx.locator.evaluate("(el) => el.click()")
     except Exception as e:
         ctx.logger.error(
             message="error performing click",
-            category="action",
+            category="act",
             auxiliary={
                 "error": {"value": str(e), "type": "string"},
                 "trace": {
@@ -360,6 +356,7 @@ async def click_element(ctx: MethodHandlerContext) -> None:
                 "args": {"value": json.dumps(ctx.args), "type": "object"},
             },
         )
+        return e
 
     await handle_possible_page_navigation(
         "click",
