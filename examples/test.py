@@ -98,7 +98,7 @@ async def main():
         model_name="gemini/gemini-2.5-flash-preview-04-17",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
         # Use verbose=2 for medium-detail logs (1=minimal, 3=debug)
-        verbose=3,
+        verbose=2,
     )
 
     stagehand = Stagehand(
@@ -124,8 +124,8 @@ async def main():
     # await page.act(res)
     await page.act("click on the Browserbase link")
     await page.extract("the text 'Get Started'")
-    await page.locator("xpath=/html/body/div/ul[2]/li[2]/a").click()
-    await page.wait_for_load_state('networkidle')
+    # await page.locator("xpath=/html/body/div/ul[2]/li[2]/a").click()
+    # await page.wait_for_load_state('networkidle')
     new_page = await stagehand.context.new_page()
     await new_page.goto("https://www.google.com")
     tree = await get_accessibility_tree(new_page, stagehand.logger)

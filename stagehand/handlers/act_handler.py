@@ -1,5 +1,16 @@
 from stagehand.llm.prompts import build_act_observe_prompt
 from stagehand.types import ActOptions, ActResult, ObserveOptions, ObserveResult
+from stagehand.handlers.act_handler_utils import (
+    MethodHandlerContext,
+    method_handler_map,
+    fallback_locator_method,
+    PlaywrightCommandException,
+)
+from typing import List, Any, Optional
+
+class PlaywrightCommandMethodNotSupportedException(PlaywrightCommandException):
+    """Custom exception for unsupported Playwright methods."""
+    pass
 
 
 class ActHandler:
@@ -33,25 +44,141 @@ class ActHandler:
         )
         prompt = build_act_observe_prompt(
             action=action_task,
-            supported_actions=["click", "fill", "type", "press"],
+            supported_actions=list(method_handler_map.keys()), # Use keys from the map
             variables=options.get("variables"),
         )
-        # Wrap around observe options object
-        observe_options = ObserveOptions(instruction=prompt)
-        observe_result = await self.stagehand_page._observe_handler.observe(
+        
+        observe_options_dict = {"instruction": prompt}
+        # Add other observe options from ActOptions if they exist
+        if options.get("model_name"):
+            observe_options_dict["model_name"] = options.get("model_name")
+        if options.get("model_client_options"):
+            observe_options_dict["model_client_options"] = options.get("model_client_options")
+        
+        observe_options = ObserveOptions(**observe_options_dict)
+        
+        observe_results: List[ObserveResult] = await self.stagehand_page._observe_handler.observe(
             observe_options, from_act=True
         )
-        if len(observe_result) == 0:
-            return ActResult(
-                success=False, message="No observe results found", action=action_task
-            )
-        else:
-            return self._act_from_observe_result(observe_result[0])
 
-    def _act_from_observe_result(self, observe_result: ObserveResult) -> ActResult:
-        self.logger.info(
-            "observe result",
+        if not observe_results:
+            return ActResult(
+                success=False, message="No observe results found for action", action=action_task
+            )
+
+        element_to_act_on = observe_results[0]
+
+        # Substitute variables in arguments
+        if options.get("variables"):
+            variables = options.get("variables", {})
+            element_to_act_on.arguments = [
+                str(arg).replace(f"%{key}%", str(value)) 
+                for arg in (element_to_act_on.arguments or []) 
+                for key, value in variables.items()
+            ]
+
+        # domSettleTimeoutMs might come from options if specified for act
+        dom_settle_timeout_ms = options.get("dom_settle_timeout_ms")
+
+        try:
+            await self._perform_playwright_method(
+                method=element_to_act_on.method,
+                args=element_to_act_on.arguments or [],
+                xpath=element_to_act_on.selector.replace("xpath=", ""),
+                dom_settle_timeout_ms=dom_settle_timeout_ms
+            )
+            return ActResult(
+                success=True,
+                message=f"Action [{element_to_act_on.method}] performed successfully on selector: {element_to_act_on.selector}",
+                action=element_to_act_on.description or f"ObserveResult action ({element_to_act_on.method})"
+            )
+        except Exception as e:
+            self.logger.error(
+                message=f"{str(e)}",
+            )
+            return ActResult(
+                success=False,
+                message=f"Failed to perform act: {str(e)}",
+                action=action_task
+            )
+
+    async def _act_from_observe_result(self, observe_result: ObserveResult) -> ActResult:
+        # This method in the original TypeScript (`actFromObserveResult`) contained logic
+        # for self-healing if an action failed, by re-observing and trying again.
+        # The current `act` method above has been refactored to call `_perform_playwright_method`
+        # directly after the initial observe. To restore self-healing, this method would need
+        # to be fully implemented with that logic, and `act` would call this method.
+        self.logger.debug(
+            message="_act_from_observe_result called",
             category="act",
-            auxiliary={"observe_result": observe_result},
+            auxiliary={"observe_result": observe_result.model_dump_json() if hasattr(observe_result, 'model_dump_json') else str(observe_result)},
         )
-        pass
+        
+        # Placeholder: The actual implementation of self-healing would go here.
+        # For now, it just logs and indicates it's not fully implemented to match TS.
+        action_description = observe_result.description or f"ObserveResult action ({observe_result.method})"
+        self.logger.warning(
+            message="Self-healing part of _act_from_observe_result is not implemented in this version.",
+            category="act",
+        )
+        # This would typically attempt the action, catch errors, and then potentially call
+        # self.stagehand_page.act(...) with the original instruction for self-healing.
+        # Since the primary action attempt is now in `act()`, this method is more of a stub.
+        return ActResult(success=False, message="Self-healing not implemented", action=action_description)
+    
+    async def _perform_playwright_method(
+        self,
+        method: str,
+        args: List[Any],
+        xpath: str,
+        dom_settle_timeout_ms: Optional[int] = None,
+    ):
+        locator = self.stagehand_page._page.locator(f"xpath={xpath}").first
+        initial_url = self.stagehand_page._page.url
+
+        self.logger.debug(
+            message="performing playwright method",
+            category="act",
+            auxiliary={
+                    "xpath": {"value": xpath, "type": "string"},
+                    "method": {"value": method, "type": "string"},
+                },
+            )
+
+        context = MethodHandlerContext(
+            method=method,
+            locator=locator,
+            xpath=xpath,
+            args=args,
+            logger=self.logger,
+            stagehand_page=self.stagehand_page,
+            initial_url=initial_url,
+            dom_settle_timeout_ms=dom_settle_timeout_ms,
+        )
+
+        try:
+            method_fn = method_handler_map.get(method)
+
+            if method_fn:
+                await method_fn(context)
+            # Check if the method exists on the locator object and is callable
+            elif hasattr(locator, method) and callable(getattr(locator, method)):
+                await fallback_locator_method(context)
+            else:
+                self.logger.warning(
+                    message="chosen method is invalid",
+                    category="act",
+                    auxiliary={"method": {"value": method, "type": "string"}},
+                )
+                raise PlaywrightCommandMethodNotSupportedException(
+                    f"Method {method} not supported"
+                )
+
+            await self.stagehand_page._wait_for_settled_dom(dom_settle_timeout_ms)
+        except Exception as e:
+            self.logger.error(
+                message=f"{str(e)}",
+            )
+            if not isinstance(e, PlaywrightCommandException):
+                raise PlaywrightCommandException(str(e)) from e
+            raise
