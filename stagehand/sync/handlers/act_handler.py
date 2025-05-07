@@ -1,12 +1,12 @@
 import traceback
 from typing import Any, Optional, Union
 
-from stagehand.handlers.act_handler_utils import (
+from stagehand.llm.prompts import build_act_observe_prompt
+from stagehand.sync.handlers.act_handler_utils import (
     MethodHandlerContext,
     fallback_locator_method,
     method_handler_map,
 )
-from stagehand.llm.prompts import build_act_observe_prompt
 from stagehand.types import ActOptions, ActResult, ObserveOptions, ObserveResult
 
 
