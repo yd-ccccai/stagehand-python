@@ -1,12 +1,14 @@
-from stagehand.llm.prompts import build_act_observe_prompt
-from stagehand.types import ActOptions, ActResult, ObserveOptions, ObserveResult
+from typing import Any, Optional
+
 from stagehand.handlers.act_handler_utils import (
     MethodHandlerContext,
-    method_handler_map,
-    fallback_locator_method,
     PlaywrightCommandException,
+    fallback_locator_method,
+    method_handler_map,
 )
-from typing import List, Any, Optional
+from stagehand.llm.prompts import build_act_observe_prompt
+from stagehand.types import ActOptions, ActResult, ObserveOptions, ObserveResult
+
 
 class PlaywrightCommandMethodNotSupportedException(PlaywrightCommandException):
     """Custom exception for unsupported Playwright methods."""
@@ -44,26 +46,32 @@ class ActHandler:
         )
         prompt = build_act_observe_prompt(
             action=action_task,
-            supported_actions=list(method_handler_map.keys()), # Use keys from the map
+            supported_actions=list(method_handler_map.keys()),  # Use keys from the map
             variables=options.get("variables"),
         )
-        
+
         observe_options_dict = {"instruction": prompt}
         # Add other observe options from ActOptions if they exist
         if options.get("model_name"):
             observe_options_dict["model_name"] = options.get("model_name")
         if options.get("model_client_options"):
-            observe_options_dict["model_client_options"] = options.get("model_client_options")
-        
+            observe_options_dict["model_client_options"] = options.get(
+                "model_client_options"
+            )
+
         observe_options = ObserveOptions(**observe_options_dict)
-        
-        observe_results: List[ObserveResult] = await self.stagehand_page._observe_handler.observe(
-            observe_options, from_act=True
+
+        observe_results: list[ObserveResult] = (
+            await self.stagehand_page._observe_handler.observe(
+                observe_options, from_act=True
+            )
         )
 
         if not observe_results:
             return ActResult(
-                success=False, message="No observe results found for action", action=action_task
+                success=False,
+                message="No observe results found for action",
+                action=action_task,
             )
 
         element_to_act_on = observe_results[0]
@@ -72,8 +80,8 @@ class ActHandler:
         if options.get("variables"):
             variables = options.get("variables", {})
             element_to_act_on.arguments = [
-                str(arg).replace(f"%{key}%", str(value)) 
-                for arg in (element_to_act_on.arguments or []) 
+                str(arg).replace(f"%{key}%", str(value))
+                for arg in (element_to_act_on.arguments or [])
                 for key, value in variables.items()
             ]
 
@@ -85,12 +93,13 @@ class ActHandler:
                 method=element_to_act_on.method,
                 args=element_to_act_on.arguments or [],
                 xpath=element_to_act_on.selector.replace("xpath=", ""),
-                dom_settle_timeout_ms=dom_settle_timeout_ms
+                dom_settle_timeout_ms=dom_settle_timeout_ms,
             )
             return ActResult(
                 success=True,
                 message=f"Action [{element_to_act_on.method}] performed successfully on selector: {element_to_act_on.selector}",
-                action=element_to_act_on.description or f"ObserveResult action ({element_to_act_on.method})"
+                action=element_to_act_on.description
+                or f"ObserveResult action ({element_to_act_on.method})",
             )
         except Exception as e:
             self.logger.error(
@@ -99,10 +108,12 @@ class ActHandler:
             return ActResult(
                 success=False,
                 message=f"Failed to perform act: {str(e)}",
-                action=action_task
+                action=action_task,
             )
 
-    async def _act_from_observe_result(self, observe_result: ObserveResult) -> ActResult:
+    async def _act_from_observe_result(
+        self, observe_result: ObserveResult
+    ) -> ActResult:
         # This method in the original TypeScript (`actFromObserveResult`) contained logic
         # for self-healing if an action failed, by re-observing and trying again.
         # The current `act` method above has been refactored to call `_perform_playwright_method`
@@ -111,12 +122,21 @@ class ActHandler:
         self.logger.debug(
             message="_act_from_observe_result called",
             category="act",
-            auxiliary={"observe_result": observe_result.model_dump_json() if hasattr(observe_result, 'model_dump_json') else str(observe_result)},
+            auxiliary={
+                "observe_result": (
+                    observe_result.model_dump_json()
+                    if hasattr(observe_result, "model_dump_json")
+                    else str(observe_result)
+                )
+            },
         )
-        
+
         # Placeholder: The actual implementation of self-healing would go here.
         # For now, it just logs and indicates it's not fully implemented to match TS.
-        action_description = observe_result.description or f"ObserveResult action ({observe_result.method})"
+        action_description = (
+            observe_result.description
+            or f"ObserveResult action ({observe_result.method})"
+        )
         self.logger.warning(
             message="Self-healing part of _act_from_observe_result is not implemented in this version.",
             category="act",
@@ -124,12 +144,16 @@ class ActHandler:
         # This would typically attempt the action, catch errors, and then potentially call
         # self.stagehand_page.act(...) with the original instruction for self-healing.
         # Since the primary action attempt is now in `act()`, this method is more of a stub.
-        return ActResult(success=False, message="Self-healing not implemented", action=action_description)
-    
+        return ActResult(
+            success=False,
+            message="Self-healing not implemented",
+            action=action_description,
+        )
+
     async def _perform_playwright_method(
         self,
         method: str,
-        args: List[Any],
+        args: list[Any],
         xpath: str,
         dom_settle_timeout_ms: Optional[int] = None,
     ):
@@ -140,10 +164,10 @@ class ActHandler:
             message="performing playwright method",
             category="act",
             auxiliary={
-                    "xpath": {"value": xpath, "type": "string"},
-                    "method": {"value": method, "type": "string"},
-                },
-            )
+                "xpath": {"value": xpath, "type": "string"},
+                "method": {"value": method, "type": "string"},
+            },
+        )
 
         context = MethodHandlerContext(
             method=method,

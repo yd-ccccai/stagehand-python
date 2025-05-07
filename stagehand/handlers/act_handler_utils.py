@@ -1,11 +1,13 @@
 import json
+from collections.abc import Coroutine
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from stagehand.page import StagehandPage
 
 from playwright.async_api import Locator, Page
+
 
 class PlaywrightCommandException(Exception):
     pass
@@ -21,7 +23,7 @@ class MethodHandlerContext:
     locator: Locator
     xpath: str
     args: list[Any]
-    stagehand_page: 'StagehandPage'
+    stagehand_page: "StagehandPage"
     initial_url: str
     logger: Optional[Callable] = None
     dom_settle_timeout_ms: Optional[int] = None
@@ -102,7 +104,10 @@ async def scroll_to_next_chunk(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                 },
             )
@@ -182,7 +187,10 @@ async def scroll_to_previous_chunk(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                 },
             )
@@ -207,7 +215,10 @@ async def scroll_element_into_view(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                 },
             )
@@ -277,7 +288,10 @@ async def scroll_element_to_percentage(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                     "args": {"value": json.dumps(ctx.args), "type": "object"},
                 },
@@ -297,7 +311,10 @@ async def fill_or_type(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                 },
             )
@@ -323,8 +340,18 @@ async def press_key(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
-                    "key": {"value": str(ctx.args[0]) if ctx.args and ctx.args[0] is not None else "unknown", "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
+                    "key": {
+                        "value": (
+                            str(ctx.args[0])
+                            if ctx.args and ctx.args[0] is not None
+                            else "unknown"
+                        ),
+                        "type": "string",
+                    },
                 },
             )
         raise PlaywrightCommandException(str(e))
@@ -335,7 +362,9 @@ async def click_element(ctx: MethodHandlerContext) -> None:
         ctx.logger.debug(
             message="page URL before click",
             category="action",
-            auxiliary={"url": {"value": ctx.stagehand_page._page.url, "type": "string"}},
+            auxiliary={
+                "url": {"value": ctx.stagehand_page._page.url, "type": "string"}
+            },
         )
     try:
         # Using JavaScript click to be consistent with the TS version
@@ -347,7 +376,10 @@ async def click_element(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                     "method": {"value": "click", "type": "string"},
                     "args": {"value": json.dumps(ctx.args), "type": "object"},
@@ -384,7 +416,10 @@ async def fallback_locator_method(ctx: MethodHandlerContext) -> None:
                 category="action",
                 auxiliary={
                     "error": {"value": str(e), "type": "string"},
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "xpath": {"value": ctx.xpath, "type": "string"},
                     "method": {"value": ctx.method, "type": "string"},
                     "args": {"value": json.dumps(ctx.args), "type": "object"},
@@ -397,7 +432,7 @@ async def handle_possible_page_navigation(
     action_description: str,
     xpath: str,
     initial_url: str,
-    stagehand_page: 'StagehandPage',
+    stagehand_page: "StagehandPage",
     logger: Optional[Callable] = None,
     dom_settle_timeout_ms: Optional[int] = None,
 ) -> None:
@@ -417,11 +452,10 @@ async def handle_possible_page_navigation(
             # We are checking if a page was opened recently.
             # A more robust way might involve listening to 'page' event *before* the action.
             # However, to closely match the TS logic's timing:
-            pass # If a page was opened by the action, it should be caught here.
+            pass  # If a page was opened by the action, it should be caught here.
         new_opened_tab = await new_page_info.value
     except Exception:
         new_opened_tab = None
-
 
     if logger:
         logger.debug(
@@ -429,7 +463,9 @@ async def handle_possible_page_navigation(
             category="action",
             auxiliary={
                 "newOpenedTab": {
-                    "value": "opened a new tab" if new_opened_tab else "no new tabs opened",
+                    "value": (
+                        "opened a new tab" if new_opened_tab else "no new tabs opened"
+                    ),
                     "type": "string",
                 }
             },
@@ -455,7 +491,10 @@ async def handle_possible_page_navigation(
                 message="wait for settled DOM timeout hit",
                 category="action",
                 auxiliary={
-                    "trace": {"value": getattr(e, "__traceback__", ""), "type": "string"},
+                    "trace": {
+                        "value": getattr(e, "__traceback__", ""),
+                        "type": "string",
+                    },
                     "message": {"value": str(e), "type": "string"},
                 },
             )
@@ -471,19 +510,27 @@ async def handle_possible_page_navigation(
             logger.info(
                 message="new page detected with URL",
                 category="action",
-                auxiliary={"url": {"value": stagehand_page._page.url, "type": "string"}},
+                auxiliary={
+                    "url": {"value": stagehand_page._page.url, "type": "string"}
+                },
             )
 
 
-method_handler_map: dict[str, Callable[[MethodHandlerContext], Coroutine[None, None, None]]] = {
+method_handler_map: dict[
+    str, Callable[[MethodHandlerContext], Coroutine[None, None, None]]
+] = {
     "scrollIntoView": scroll_element_into_view,
     "scrollTo": scroll_element_to_percentage,
     "scroll": scroll_element_to_percentage,
-    "mouse.wheel": scroll_element_to_percentage, # Playwright Python doesn't have mouse.wheel on locator directly.
-                                               # This might need a page.mouse.wheel(x, y) or evaluate.
-                                               # For now, mapping to scroll percentage as in TS.
+    "mouse.wheel": (
+        scroll_element_to_percentage
+    ),  # Playwright Python doesn't have mouse.wheel on locator directly.
+    # This might need a page.mouse.wheel(x, y) or evaluate.
+    # For now, mapping to scroll percentage as in TS.
     "fill": fill_or_type,
-    "type": fill_or_type, # Playwright Python's type often appends. Fill is usually safer for replacement.
+    "type": (
+        fill_or_type
+    ),  # Playwright Python's type often appends. Fill is usually safer for replacement.
     "press": press_key,
     "click": click_element,
     "nextChunk": scroll_to_next_chunk,
