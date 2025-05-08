@@ -57,10 +57,14 @@ class ExtractHandler:
         # TODO add targeted extract
         # selector = options.selector
 
-        self.logger.info(
-            "Starting extraction",
+        # TODO: add schema to log
+        self.logger.debug(
+            "extract",
             category="extract",
             auxiliary={"instruction": instruction},
+        )
+        self.logger.info(
+            f"Starting extraction with instruction: '{instruction}'", category="extract"
         )
 
         # Wait for DOM to settle
@@ -99,7 +103,7 @@ class ExtractHandler:
         )
 
         # Process extraction response
-        result = extraction_response.get("data", {})
+        raw_data_dict = extraction_response.get("data", {})
         metadata = extraction_response.get("metadata", {})
         # TODO update metrics for token usage
         # prompt_tokens = extraction_response.get("prompt_tokens", 0)
@@ -108,21 +112,38 @@ class ExtractHandler:
 
         # Inject URLs back into result if necessary
         if url_paths:
-            inject_urls(result, url_paths, id_to_url_mapping)
+            inject_urls(
+                raw_data_dict, url_paths, id_to_url_mapping
+            )  # Modifies raw_data_dict in place
 
         if metadata.get("completed"):
             self.logger.debug(
                 "Extraction completed successfully",
-                auxiliary={"result": result},
+                auxiliary={"result": raw_data_dict},
             )
         else:
             self.logger.debug(
                 "Extraction incomplete after processing all data",
-                auxiliary={"result": result},
+                auxiliary={"result": raw_data_dict},
             )
 
+        processed_data_payload = raw_data_dict  # Default to the raw dictionary
+
+        if schema and isinstance(
+            raw_data_dict, dict
+        ):  # schema is the Pydantic model type
+            try:
+                validated_model_instance = schema.model_validate(raw_data_dict)
+                processed_data_payload = validated_model_instance  # Payload is now the Pydantic model instance
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to validate extracted data against schema {schema.__name__}: {e}. Keeping raw data dict in .data field."
+                )
+
         # Create ExtractResult object
-        return ExtractResult(**result)
+        return ExtractResult(
+            data=processed_data_payload,
+        )
 
     async def _extract_page_text(self) -> ExtractResult:
         """Extract just the text content from the page."""
@@ -130,7 +151,7 @@ class ExtractHandler:
 
         # Get page text using DOM evaluation
         # I don't love using js inside of python
-        page_text = await self.stagehand_page.page.evaluate(
+        page_text = await self.stagehand_page._page.evaluate(
             """
             () => {
                 // Simple function to get all visible text from the page
@@ -154,6 +175,4 @@ class ExtractHandler:
         """
         )
 
-        # TODO: update metrics for token usage
-
-        return ExtractResult(page_text)
+        return ExtractResult(data=page_text)

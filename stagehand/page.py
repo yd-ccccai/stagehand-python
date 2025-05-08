@@ -215,6 +215,7 @@ class StagehandPage:
     async def extract(
         self, options: Union[str, ExtractOptions, None] = None
     ) -> ExtractResult:
+        # TODO update args
         """
         Extract data using AI via the Stagehand server.
 
@@ -225,7 +226,7 @@ class StagehandPage:
                 See `stagehand.schemas.ExtractOptions` for details on expected fields.
 
         Returns:
-            ExtractResult: The result from the Stagehand server's extraction execution.
+            ExtractResult: Depending on the type of the schema provided, the result will be a Pydantic model or JSON representation of the extracted data.
         """
         await self.ensure_injection()
 
@@ -255,6 +256,7 @@ class StagehandPage:
                 result = await self._extract_handler.extract(
                     None,
                     "request_id",
+                    None,  # Explicitly pass None for schema if no options
                 )
                 return result
 
@@ -262,24 +264,30 @@ class StagehandPage:
             if isinstance(options, str):
                 options = ExtractOptions(instruction=options)
 
-            # Call local extract implementation
-            schema = None
+            # Determine the schema to pass to the handler
+            schema_to_pass_to_handler = None
             if (
                 hasattr(options, "schema_definition")
                 and options.schema_definition != DEFAULT_EXTRACT_SCHEMA
             ):
-                # If a custom schema is provided, use it
                 if isinstance(options.schema_definition, type) and issubclass(
                     options.schema_definition, BaseModel
                 ):
-                    schema = options.schema_definition
+                    # Case 1: Pydantic model class
+                    schema_to_pass_to_handler = options.schema_definition
+                elif isinstance(options.schema_definition, dict):
+                    # TODO: revisit this case to pass the json_schema since litellm has a bug when passing it directly
+                    # Case 2: Dictionary
+                    # Assume it's a direct JSON schema dictionary
+                    schema_to_pass_to_handler = options.schema_definition
 
+            # Call local extract implementation
             result = await self._extract_handler.extract(
                 options,
                 "request_id",
-                schema,
+                schema_to_pass_to_handler,
             )
-            return result
+            return result.data
 
         lock = self._stagehand._get_lock_for_session()
         async with lock:

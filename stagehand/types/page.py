@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 # Ignore linting error for this class name since it's used as a constant
@@ -144,14 +144,11 @@ class ExtractResult(BaseModel):
     """
     Result of the 'extract' command.
 
-    This is a generic model to hold extraction results of different types.
-    The actual fields will depend on the schema provided in ExtractOptions.
+    The 'data' field will contain the Pydantic model instance if a schema was provided
+    and validation was successful, otherwise it may contain the raw extracted dictionary.
     """
 
-    # This class is intentionally left without fields so it can accept
-    # any fields from the extraction result based on the schema
-
-    model_config = ConfigDict(extra="allow")  # Allow any extra fields
+    data: Optional[Any] = None
 
     def __getitem__(self, key):
         """

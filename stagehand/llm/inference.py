@@ -2,7 +2,7 @@
 
 import json
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from pydantic import BaseModel
 
@@ -86,7 +86,6 @@ def observe(
         logger.info("Got LLM response")
         logger.debug(
             "LLM Response",
-            category="observe",
             auxiliary={
                 "content": content,
                 "prompt_tokens": prompt_tokens,
@@ -129,7 +128,7 @@ def observe(
 def extract(
     instruction: str,
     tree_elements: str,
-    schema: Optional[type[BaseModel]] = None,
+    schema: Optional[Union[type[BaseModel], dict]] = None,
     llm_client: Any = None,
     request_id: str = "",
     user_provided_instructions: Optional[str] = None,
@@ -284,7 +283,6 @@ def extract(
 
     logger.debug(
         "LLM response",
-        category="extract",
         auxiliary={
             "metadata": metadata,
             "prompt_tokens": total_prompt_tokens,
