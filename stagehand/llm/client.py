@@ -110,4 +110,3 @@ class LLMClient:
             logger.error(f"Error calling litellm.completion: {e}", exc_info=True)
             # Consider more specific exception handling based on litellm errors
             raise
-
