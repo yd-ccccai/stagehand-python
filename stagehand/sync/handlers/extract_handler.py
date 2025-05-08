@@ -1,16 +1,17 @@
 """Extract handler for performing data extraction from page elements using LLMs."""
 
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Optional, Type, TypeVar
 
 from pydantic import BaseModel
 
 from stagehand.llm.inference import extract as extract_inference
 from stagehand.schemas import ExtractOptions, ExtractResult
-from stagehand.sync.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
-from stagehand.utils import transform_url_strings_to_ids, inject_urls
+from stagehand.sync.a11y.utils import (
+    get_accessibility_tree,
+)
+from stagehand.utils import inject_urls, transform_url_strings_to_ids
 
-
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class ExtractHandler:
@@ -53,7 +54,7 @@ class ExtractHandler:
             # If no options provided, extract the entire page text
             self.logger.info("Extracting entire page text")
             return self._extract_page_text()
-        
+
         instruction = options.instruction
         selector = options.selector
 
@@ -67,8 +68,12 @@ class ExtractHandler:
         self.stagehand_page._wait_for_settled_dom()
 
         # Get DOM representation using accessibility tree
-        target_xpath = selector.replace("xpath=", "") if selector and selector.startswith("xpath=") else ""
-        
+        target_xpath = (
+            selector.replace("xpath=", "")
+            if selector and selector.startswith("xpath=")
+            else ""
+        )
+
         # Get accessibility tree data
         tree = get_accessibility_tree(self.stagehand_page, self.logger)
         self.logger.info("Getting accessibility tree data")
@@ -127,10 +132,11 @@ class ExtractHandler:
     def _extract_page_text(self) -> ExtractResult:
         """Extract just the text content from the page."""
         self.stagehand_page._wait_for_settled_dom()
-        
+
         # Get page text using DOM evaluation
         # I don't love using js inside of python
-        page_text = self.stagehand_page.page.evaluate("""
+        page_text = self.stagehand_page.page.evaluate(
+            """
             () => {
                 // Simple function to get all visible text from the page
                 function getVisibleText(node) {
@@ -150,12 +156,13 @@ class ExtractHandler:
                 
                 return getVisibleText(document.body).trim();
             }
-        """)
-        
+        """
+        )
+
         return ExtractResult(
             data={"page_text": page_text},
             metadata={"completed": True},
             prompt_tokens=0,
             completion_tokens=0,
             inference_time_ms=0,
-        ) 
+        )

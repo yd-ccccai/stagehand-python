@@ -17,16 +17,16 @@ from .llm import (
     ChatMessage,
 )
 from .page import (
+    DEFAULT_EXTRACT_SCHEMA,
     ActOptions,
     ActResult,
+    ExtractOptions,
+    ExtractResult,
+    MetadataSchema,
     ObserveElementSchema,
     ObserveInferenceSchema,
     ObserveOptions,
     ObserveResult,
-    MetadataSchema,
-    DEFAULT_EXTRACT_SCHEMA,
-    ExtractOptions,
-    ExtractResult,
 )
 
 __all__ = [

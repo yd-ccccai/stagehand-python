@@ -2,20 +2,21 @@
 
 import json
 import time
-from typing import Any, Callable, Optional, Dict, List, Type, Union
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel
+
 from stagehand.llm.prompts import (
-    build_observe_system_prompt,
-    build_observe_user_message,
     build_extract_system_prompt,
     build_extract_user_prompt,
-    build_metadata_system_prompt,
     build_metadata_prompt,
+    build_metadata_system_prompt,
+    build_observe_system_prompt,
+    build_observe_user_message,
 )
 from stagehand.types import (
-    ObserveInferenceSchema,
     MetadataSchema,
+    ObserveInferenceSchema,
 )
 
 
@@ -82,7 +83,17 @@ def observe(
 
         # Parse the response
         content = response.choices[0].message.content
-        logger.info(f"LLM Response: {content}")
+        logger.info("Got LLM response")
+        logger.debug(
+            "LLM Response",
+            category="observe",
+            auxiliary={
+                "content": content,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "inference_time_ms": inference_time_ms,
+            },
+        )
         if isinstance(content, str):
             try:
                 parsed_response = json.loads(content)
@@ -118,7 +129,7 @@ def observe(
 def extract(
     instruction: str,
     tree_elements: str,
-    schema: Optional[Type[BaseModel]] = None,
+    schema: Optional[type[BaseModel]] = None,
     llm_client: Any = None,
     request_id: str = "",
     user_provided_instructions: Optional[str] = None,
@@ -126,7 +137,7 @@ def extract(
     log_inference_to_file: bool = False,
     is_using_text_extract: bool = False,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Call LLM to extract structured data from the page based on the provided instruction and schema.
 
@@ -143,22 +154,16 @@ def extract(
         **kwargs: Additional parameters to pass to the LLM client
 
     Returns:
-        Dict containing the extraction results and metadata
+        dict containing the extraction results and metadata
     """
-    logger.info(
-        "Calling LLM for extraction",
-        category="extract",
-        auxiliary={"instruction": instruction},
-    )
+    logger.info("Calling LLM")
 
     # Create system and user messages for extraction
     system_message = build_extract_system_prompt(
         is_using_text_extract=is_using_text_extract,
-        user_provided_instructions=user_provided_instructions
+        user_provided_instructions=user_provided_instructions,
     )
-    user_message = build_extract_user_prompt(
-        instruction, tree_elements
-    )
+    user_message = build_extract_user_prompt(instruction, tree_elements)
 
     extract_messages = [
         system_message,
@@ -167,14 +172,14 @@ def extract(
 
     # Call LLM for extraction
     start_time = time.time()
-    
+
     # Determine if we need to use schema-based response format
-    #TODO: if schema is json, return json
+    # TODO: if schema is json, return json
     response_format = {"type": "json_object"}
     if schema:
         # If schema is a Pydantic model, use it directly
         response_format = schema
-    
+
     # Call the LLM with appropriate parameters
     try:
         extract_response = llm_client.create_response(
@@ -183,7 +188,7 @@ def extract(
             response_format=response_format,
             temperature=0.1,
             request_id=request_id,
-            **kwargs
+            **kwargs,
         )
         extract_time_ms = int((time.time() - start_time) * 1000)
 
@@ -197,13 +202,15 @@ def extract(
             try:
                 extracted_data = json.loads(extract_content)
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse JSON extraction response: {extract_content}")
+                logger.error(
+                    f"Failed to parse JSON extraction response: {extract_content}"
+                )
                 extracted_data = {}
         else:
             extracted_data = extract_content
     except Exception as e:
         logger.error(f"Error in extract inference: {str(e)}")
-        
+
         # In case of failure, return empty data
         extracted_data = {}
         prompt_tokens = 0
@@ -213,15 +220,15 @@ def extract(
     # Generate metadata about the extraction
     metadata_system_message = build_metadata_system_prompt()
     metadata_user_message = build_metadata_prompt(instruction, extracted_data, 1, 1)
-    
+
     metadata_messages = [
         metadata_system_message,
         metadata_user_message,
     ]
-    
+
     # Define the metadata schema
     metadata_schema = MetadataSchema
-    
+
     # Call LLM for metadata
     try:
         metadata_start_time = time.time()
@@ -234,10 +241,11 @@ def extract(
         )
         metadata_end_time = time.time()
         metadata_time_ms = int((metadata_end_time - metadata_start_time) * 1000)
-        
+        logger.info("Got LLM response")
+
         # Extract metadata content
         metadata_content = metadata_response.choices[0].message.content
-        
+
         # Parse metadata content
         if isinstance(metadata_content, str):
             try:
@@ -247,24 +255,24 @@ def extract(
                 metadata = {"completed": False, "progress": "Failed to parse metadata"}
         else:
             metadata = metadata_content
-        
+
         # Get token usage for metadata
         metadata_prompt_tokens = metadata_response.usage.prompt_tokens
         metadata_completion_tokens = metadata_response.usage.completion_tokens
     except Exception as e:
         logger.error(f"Error in metadata inference: {str(e)}")
-        
+
         # In case of failure, use default metadata
         metadata = {"completed": False, "progress": "Metadata generation failed"}
         metadata_prompt_tokens = 0
         metadata_completion_tokens = 0
         metadata_time_ms = 0
-    
+
     # Calculate total tokens and time
     total_prompt_tokens = prompt_tokens + metadata_prompt_tokens
     total_completion_tokens = completion_tokens + metadata_completion_tokens
     total_inference_time_ms = extract_time_ms + metadata_time_ms
-    
+
     # Create the final result
     result = {
         "data": extracted_data,
@@ -273,9 +281,9 @@ def extract(
         "completion_tokens": total_completion_tokens,
         "inference_time_ms": total_inference_time_ms,
     }
-    
-    logger.info(
-        "LLM extraction completed",
+
+    logger.debug(
+        "LLM response",
         category="extract",
         auxiliary={
             "metadata": metadata,
@@ -284,5 +292,5 @@ def extract(
             "inference_time_ms": total_inference_time_ms,
         },
     )
-    
+
     return result

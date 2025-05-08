@@ -1,10 +1,13 @@
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
+# Ignore linting error for this class name since it's used as a constant
+# ruff: noqa: N801
 class DEFAULT_EXTRACT_SCHEMA(BaseModel):
     extraction: str
+
 
 class ObserveElementSchema(BaseModel):
     element_id: int
@@ -17,6 +20,7 @@ class ObserveElementSchema(BaseModel):
 
 class ObserveInferenceSchema(BaseModel):
     elements: list[ObserveElementSchema]
+
 
 class MetadataSchema(BaseModel):
     completed: bool
@@ -104,7 +108,7 @@ class ObserveResult(BaseModel):
         This allows usage like result["selector"] in addition to result.selector
         """
         return getattr(self, key)
-    
+
 
 class ExtractOptions(BaseModel):
     """

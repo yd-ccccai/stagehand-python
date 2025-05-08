@@ -1,16 +1,15 @@
 """Extract handler for performing data extraction from page elements using LLMs."""
 
-from typing import Optional, Type, TypeVar
+from typing import Optional, TypeVar
 
 from pydantic import BaseModel
 
 from stagehand.a11y.utils import get_accessibility_tree
 from stagehand.llm.inference import extract as extract_inference
 from stagehand.types import ExtractOptions, ExtractResult
-from stagehand.utils import transform_url_strings_to_ids, inject_urls
+from stagehand.utils import inject_urls, transform_url_strings_to_ids
 
-
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class ExtractHandler:
@@ -36,7 +35,7 @@ class ExtractHandler:
         self,
         options: Optional[ExtractOptions] = None,
         request_id: str = "",
-        schema: Optional[Type[BaseModel]] = None,
+        schema: Optional[type[BaseModel]] = None,
     ) -> ExtractResult:
         """
         Execute an extraction operation locally.
@@ -53,9 +52,10 @@ class ExtractHandler:
             # If no options provided, extract the entire page text
             self.logger.info("Extracting entire page text")
             return await self._extract_page_text()
-        
+
         instruction = options.instruction
-        selector = options.selector
+        # TODO add targeted extract
+        # selector = options.selector
 
         self.logger.info(
             "Starting extraction",
@@ -66,9 +66,13 @@ class ExtractHandler:
         # Wait for DOM to settle
         await self.stagehand_page._wait_for_settled_dom()
 
-        # Get DOM representation using accessibility tree
-        target_xpath = selector.replace("xpath=", "") if selector and selector.startswith("xpath=") else ""
-        
+        # TODO add targeted extract
+        # target_xpath = (
+        #     selector.replace("xpath=", "")
+        #     if selector and selector.startswith("xpath=")
+        #     else ""
+        # )
+
         # Get accessibility tree data
         tree = await get_accessibility_tree(self.stagehand_page, self.logger)
         self.logger.info("Getting accessibility tree data")
@@ -85,7 +89,7 @@ class ExtractHandler:
         # Use inference to call the LLM
         extraction_response = extract_inference(
             instruction=instruction,
-            dom_elements=output_string,
+            tree_elements=output_string,
             schema=transformed_schema,
             llm_client=self.stagehand.llm,
             request_id=request_id,
@@ -118,17 +122,16 @@ class ExtractHandler:
             )
 
         # Create ExtractResult object
-        return ExtractResult(
-            result
-        )
+        return ExtractResult(**result)
 
     async def _extract_page_text(self) -> ExtractResult:
         """Extract just the text content from the page."""
         await self.stagehand_page._wait_for_settled_dom()
-        
+
         # Get page text using DOM evaluation
         # I don't love using js inside of python
-        page_text = await self.stagehand_page.page.evaluate("""
+        page_text = await self.stagehand_page.page.evaluate(
+            """
             () => {
                 // Simple function to get all visible text from the page
                 function getVisibleText(node) {
@@ -148,10 +151,9 @@ class ExtractHandler:
                 
                 return getVisibleText(document.body).trim();
             }
-        """)
+        """
+        )
 
-        #TODO: update metrics for token usage
-        
-        return ExtractResult(
-            page_text
-        ) 
+        # TODO: update metrics for token usage
+
+        return ExtractResult(page_text)

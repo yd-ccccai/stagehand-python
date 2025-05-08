@@ -5,8 +5,8 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel
 
 from stagehand.sync.handlers.act_handler import ActHandler
-from stagehand.sync.handlers.observe_handler import ObserveHandler
 from stagehand.sync.handlers.extract_handler import ExtractHandler
+from stagehand.sync.handlers.observe_handler import ObserveHandler
 
 from ..schemas import (
     ActOptions,
@@ -218,12 +218,14 @@ class SyncStagehandPage:
         if self._stagehand.env == "LOCAL":
             # Create request ID
             import uuid
+
             request_id = str(uuid.uuid4())
 
             # If we don't have an extract handler yet, create one
             if not hasattr(self, "_extract_handler"):
-                self._extract_handler = ExtractHandler(self, self._stagehand, 
-                                                      self._stagehand.system_prompt)
+                self._extract_handler = ExtractHandler(
+                    self, self._stagehand, self._stagehand.system_prompt
+                )
 
             # Allow for no options to extract the entire page
             if options is None:
@@ -233,25 +235,30 @@ class SyncStagehandPage:
                     request_id,
                 )
                 return result
-            
+
             # Convert string to ExtractOptions if needed
             if isinstance(options, str):
                 options = ExtractOptions(instruction=options)
-            
+
             # Call local extract implementation
             schema = None
-            if hasattr(options, "schema_definition") and options.schema_definition != None:
+            if (
+                hasattr(options, "schema_definition")
+                and options.schema_definition != None
+            ):
                 # If a custom schema is provided, use it
-                if isinstance(options.schema_definition, type) and issubclass(options.schema_definition, BaseModel):
+                if isinstance(options.schema_definition, type) and issubclass(
+                    options.schema_definition, BaseModel
+                ):
                     schema = options.schema_definition
-                
+
             result = self._extract_handler.extract(
                 options,
                 request_id,
                 schema,
             )
             return result
-        
+
         # Allow for no options to extract the entire page
         if options is None:
             payload = {}

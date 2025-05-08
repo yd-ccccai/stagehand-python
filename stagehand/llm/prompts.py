@@ -22,7 +22,7 @@ User Instructions:
 
 # extract
 def build_extract_system_prompt(
-    use_text_extract: bool = False,
+    is_using_text_extract: bool = False,
     user_provided_instructions: Optional[str] = None,
 ) -> ChatMessage:
     base_content = """You are extracting content on behalf of a user.
@@ -33,15 +33,14 @@ You will be given:
 1. An instruction
 2. """
 
-
     content_detail = (
         "A text representation of a webpage to extract information from."
-        if use_text_extract
+        if is_using_text_extract
         else "A list of DOM elements to extract from."
     )
 
     instructions = (
-        f"Print the exact text from the {'text-rendered webpage' if use_text_extract else 'DOM+accessibility tree elements'} "
+        f"Print the exact text from the {'text-rendered webpage' if is_using_text_extract else 'DOM+accessibility tree elements'} "
         f"with all symbols, characters, and endlines as is.\n"
         f"Print null or an empty string if no new information is found."
     ).strip()
@@ -50,7 +49,7 @@ You will be given:
         """Once you are given the text-rendered webpage,
 you must thoroughly and meticulously analyze it. Be very careful to ensure that you
 do not miss any important information."""
-        if use_text_extract
+        if is_using_text_extract
         else (
             "If a user is attempting to extract links or URLs, you MUST respond with ONLY the IDs of the link elements.\n"
             "Do not attempt to extract links directly from the text unless absolutely necessary. "
@@ -60,7 +59,6 @@ do not miss any important information."""
     user_instructions = build_user_instructions_string(
         user_provided_instructions,
     )
-
 
     content_parts = [
         f"{base_content}{content_detail}",
@@ -75,26 +73,25 @@ do not miss any important information."""
     full_content = "\n\n".join(filter(None, content_parts))
     content = " ".join(full_content.split())
 
-
     return ChatMessage(role="system", content=content)
 
-def build_extract_user_prompt(
-    instruction: str, dom_elements: str
-) -> ChatMessage:
+
+def build_extract_user_prompt(instruction: str, tree_elements: str) -> ChatMessage:
     """
     Build the user prompt for extraction.
 
     Args:
         instruction: The instruction for what to extract
-        dom_elements: The DOM representation or text content
+        tree_elements: The DOM+accessibility tree representation
 
     Returns:
         User prompt for extract
     """
     content = f"""Instruction: {instruction}
-DOM: {dom_elements}"""
+DOM+accessibility tree: {tree_elements}"""
 
     return ChatMessage(role="user", content=content)
+
 
 def build_metadata_system_prompt() -> ChatMessage:
     """
@@ -103,7 +100,7 @@ def build_metadata_system_prompt() -> ChatMessage:
     Returns:
         System prompt for metadata
     """
-    prompt =  """You are an AI assistant that evaluates the completeness of information extraction.
+    prompt = """You are an AI assistant that evaluates the completeness of information extraction.
 
 Given:
 1. An extraction instruction
@@ -119,6 +116,7 @@ Please respond with:
 """
 
     return ChatMessage(role="system", content=prompt)
+
 
 def build_metadata_prompt(
     instruction: str, extracted_data: dict, chunks_seen: int, chunks_total: int
@@ -145,6 +143,8 @@ Evaluate if this extraction is complete according to the instruction.
 """
 
     return ChatMessage(role="user", content=prompt)
+
+
 # observe
 def build_observe_system_prompt(
     user_provided_instructions: Optional[str] = None,

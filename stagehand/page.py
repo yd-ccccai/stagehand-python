@@ -1,21 +1,21 @@
 from typing import Optional, Union
 
 from playwright.async_api import CDPSession, Page
+from pydantic import BaseModel
 
 from stagehand.handlers.act_handler import ActHandler
 from stagehand.handlers.extract_handler import ExtractHandler
 from stagehand.handlers.observe_handler import ObserveHandler
 
 from .schemas import (
+    DEFAULT_EXTRACT_SCHEMA,
     ActOptions,
     ActResult,
     ExtractOptions,
     ExtractResult,
     ObserveOptions,
     ObserveResult,
-    DEFAULT_EXTRACT_SCHEMA,
 )
-from pydantic import BaseModel
 
 _INJECTION_SCRIPT = None
 
@@ -213,8 +213,7 @@ class StagehandPage:
         return []
 
     async def extract(
-        self,
-        options: Union[str, ExtractOptions, None] = None
+        self, options: Union[str, ExtractOptions, None] = None
     ) -> ExtractResult:
         """
         Extract data using AI via the Stagehand server.
@@ -241,13 +240,14 @@ class StagehandPage:
         # Otherwise, it should be an ExtractOptions object
         else:
             payload = options.model_dump(exclude_none=True, by_alias=True)
-        
-                # If in LOCAL mode, use local implementation
+
+            # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
             # If we don't have an extract handler yet, create one
             if not hasattr(self, "_extract_handler"):
-                self._extract_handler = ExtractHandler(self, self._stagehand, 
-                                                      self._stagehand.system_prompt)
+                self._extract_handler = ExtractHandler(
+                    self, self._stagehand, self._stagehand.system_prompt
+                )
 
             # Allow for no options to extract the entire page
             if options is None:
@@ -257,18 +257,23 @@ class StagehandPage:
                     "request_id",
                 )
                 return result
-                
+
             # Convert string to ExtractOptions if needed
             if isinstance(options, str):
                 options = ExtractOptions(instruction=options)
-                
+
             # Call local extract implementation
             schema = None
-            if hasattr(options, "schema_definition") and options.schema_definition != DEFAULT_EXTRACT_SCHEMA:
+            if (
+                hasattr(options, "schema_definition")
+                and options.schema_definition != DEFAULT_EXTRACT_SCHEMA
+            ):
                 # If a custom schema is provided, use it
-                if isinstance(options.schema_definition, type) and issubclass(options.schema_definition, BaseModel):
+                if isinstance(options.schema_definition, type) and issubclass(
+                    options.schema_definition, BaseModel
+                ):
                     schema = options.schema_definition
-                    
+
             result = await self._extract_handler.extract(
                 options,
                 "request_id",
