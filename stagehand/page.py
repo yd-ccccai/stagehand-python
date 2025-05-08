@@ -242,7 +242,7 @@ class StagehandPage:
         else:
             payload = options.model_dump(exclude_none=True, by_alias=True)
 
-            # If in LOCAL mode, use local implementation
+        # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
             # If we don't have an extract handler yet, create one
             if not hasattr(self, "_extract_handler"):

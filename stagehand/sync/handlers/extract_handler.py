@@ -1,14 +1,12 @@
 """Extract handler for performing data extraction from page elements using LLMs."""
 
-from typing import Optional, Type, TypeVar
+from typing import Optional, TypeVar
 
 from pydantic import BaseModel
 
 from stagehand.llm.inference import extract as extract_inference
-from stagehand.schemas import ExtractOptions, ExtractResult
-from stagehand.sync.a11y.utils import (
-    get_accessibility_tree,
-)
+from stagehand.sync.a11y.utils import get_accessibility_tree
+from stagehand.types import ExtractOptions, ExtractResult
 from stagehand.utils import inject_urls, transform_url_strings_to_ids
 
 T = TypeVar("T", bound=BaseModel)
@@ -37,7 +35,7 @@ class ExtractHandler:
         self,
         options: Optional[ExtractOptions] = None,
         request_id: str = "",
-        schema: Optional[Type[BaseModel]] = None,
+        schema: Optional[type[BaseModel]] = None,
     ) -> ExtractResult:
         """
         Execute an extraction operation locally.
@@ -56,23 +54,28 @@ class ExtractHandler:
             return self._extract_page_text()
 
         instruction = options.instruction
-        selector = options.selector
+        # TODO add targeted extract
+        # selector = options.selector
 
-        self.logger.info(
-            "Starting extraction",
+        # TODO: add schema to log
+        self.logger.debug(
+            "extract",
             category="extract",
             auxiliary={"instruction": instruction},
+        )
+        self.logger.info(
+            f"Starting extraction with instruction: '{instruction}'", category="extract"
         )
 
         # Wait for DOM to settle
         self.stagehand_page._wait_for_settled_dom()
 
-        # Get DOM representation using accessibility tree
-        target_xpath = (
-            selector.replace("xpath=", "")
-            if selector and selector.startswith("xpath=")
-            else ""
-        )
+        # TODO add targeted extract
+        # target_xpath = (
+        #     selector.replace("xpath=", "")
+        #     if selector and selector.startswith("xpath=")
+        #     else ""
+        # )
 
         # Get accessibility tree data
         tree = get_accessibility_tree(self.stagehand_page, self.logger)
@@ -90,7 +93,7 @@ class ExtractHandler:
         # Use inference to call the LLM
         extraction_response = extract_inference(
             instruction=instruction,
-            dom_elements=output_string,
+            tree_elements=output_string,
             schema=transformed_schema,
             llm_client=self.stagehand.llm,
             request_id=request_id,
@@ -100,69 +103,52 @@ class ExtractHandler:
         )
 
         # Process extraction response
-        result = extraction_response.get("data", {})
+        raw_data_dict = extraction_response.get("data", {})
         metadata = extraction_response.get("metadata", {})
-        prompt_tokens = extraction_response.get("prompt_tokens", 0)
-        completion_tokens = extraction_response.get("completion_tokens", 0)
-        inference_time_ms = extraction_response.get("inference_time_ms", 0)
+        # TODO update metrics for token usage
+        # prompt_tokens = extraction_response.get("prompt_tokens", 0)
+        # completion_tokens = extraction_response.get("completion_tokens", 0)
+        # inference_time_ms = extraction_response.get("inference_time_ms", 0)
 
         # Inject URLs back into result if necessary
         if url_paths:
-            inject_urls(result, url_paths, id_to_url_mapping)
+            inject_urls(
+                raw_data_dict, url_paths, id_to_url_mapping
+            )  # Modifies raw_data_dict in place
 
-        self.logger.info(
-            "Extraction completed",
-            auxiliary={
-                "metadata": metadata,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "inference_time_ms": inference_time_ms,
-            },
-        )
+        if metadata.get("completed"):
+            self.logger.debug(
+                "Extraction completed successfully",
+                auxiliary={"result": raw_data_dict},
+            )
+        else:
+            self.logger.debug(
+                "Extraction incomplete after processing all data",
+                auxiliary={"result": raw_data_dict},
+            )
+
+        processed_data_payload = raw_data_dict  # Default to the raw dictionary
+
+        if schema and isinstance(
+            raw_data_dict, dict
+        ):  # schema is the Pydantic model type
+            try:
+                validated_model_instance = schema.model_validate(raw_data_dict)
+                processed_data_payload = validated_model_instance  # Payload is now the Pydantic model instance
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to validate extracted data against schema {schema.__name__}: {e}. Keeping raw data dict in .data field."
+                )
 
         # Create ExtractResult object
         return ExtractResult(
-            data=result,
-            metadata=metadata,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            inference_time_ms=inference_time_ms,
+            data=processed_data_payload,
         )
 
     def _extract_page_text(self) -> ExtractResult:
         """Extract just the text content from the page."""
         self.stagehand_page._wait_for_settled_dom()
 
-        # Get page text using DOM evaluation
-        # I don't love using js inside of python
-        page_text = self.stagehand_page.page.evaluate(
-            """
-            () => {
-                // Simple function to get all visible text from the page
-                function getVisibleText(node) {
-                    let text = '';
-                    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                        text += node.textContent.trim() + ' ';
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const style = window.getComputedStyle(node);
-                        if (style.display !== 'none' && style.visibility !== 'hidden') {
-                            for (const child of node.childNodes) {
-                                text += getVisibleText(child);
-                            }
-                        }
-                    }
-                    return text;
-                }
-                
-                return getVisibleText(document.body).trim();
-            }
-        """
-        )
-
-        return ExtractResult(
-            data={"page_text": page_text},
-            metadata={"completed": True},
-            prompt_tokens=0,
-            completion_tokens=0,
-            inference_time_ms=0,
-        )
+        tree = get_accessibility_tree(self.stagehand_page, self.logger)
+        output_string = tree["simplified"]
+        return ExtractResult(data=output_string)

@@ -149,30 +149,6 @@ class ExtractHandler:
         """Extract just the text content from the page."""
         await self.stagehand_page._wait_for_settled_dom()
 
-        # Get page text using DOM evaluation
-        # I don't love using js inside of python
-        page_text = await self.stagehand_page._page.evaluate(
-            """
-            () => {
-                // Simple function to get all visible text from the page
-                function getVisibleText(node) {
-                    let text = '';
-                    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                        text += node.textContent.trim() + ' ';
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const style = window.getComputedStyle(node);
-                        if (style.display !== 'none' && style.visibility !== 'hidden') {
-                            for (const child of node.childNodes) {
-                                text += getVisibleText(child);
-                            }
-                        }
-                    }
-                    return text;
-                }
-                
-                return getVisibleText(document.body).trim();
-            }
-        """
-        )
-
-        return ExtractResult(data=page_text)
+        tree = await get_accessibility_tree(self.stagehand_page, self.logger)
+        output_string = tree["simplified"]
+        return ExtractResult(data=output_string)

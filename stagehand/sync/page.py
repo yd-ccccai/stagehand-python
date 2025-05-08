@@ -9,6 +9,7 @@ from stagehand.sync.handlers.extract_handler import ExtractHandler
 from stagehand.sync.handlers.observe_handler import ObserveHandler
 
 from ..schemas import (
+    DEFAULT_EXTRACT_SCHEMA,
     ActOptions,
     ActResult,
     ExtractOptions,
@@ -202,7 +203,11 @@ class SyncStagehandPage:
             return [ObserveResult(**result)]
         return []
 
-    def extract(self, options: Union[str, ExtractOptions] = None) -> ExtractResult:
+    def extract(
+        self,
+        options: Union[str, ExtractOptions, None] = None,
+    ) -> ExtractResult:
+        # TODO update args
         """
         Extract data using AI via the Stagehand server synchronously.
 
@@ -212,52 +217,9 @@ class SyncStagehandPage:
                 an ExtractOptions object. If None, extracts the entire page content.
 
         Returns:
-            ExtractResult: The result from the Stagehand server's extraction execution.
+            ExtractResult: Depending on the type of the schema provided, the result will be a Pydantic model or JSON representation of the extracted data.
         """
         self.ensure_injection()
-        if self._stagehand.env == "LOCAL":
-            # Create request ID
-            import uuid
-
-            request_id = str(uuid.uuid4())
-
-            # If we don't have an extract handler yet, create one
-            if not hasattr(self, "_extract_handler"):
-                self._extract_handler = ExtractHandler(
-                    self, self._stagehand, self._stagehand.system_prompt
-                )
-
-            # Allow for no options to extract the entire page
-            if options is None:
-                # Call local extract implementation with no options
-                result = self._extract_handler.extract(
-                    None,
-                    request_id,
-                )
-                return result
-
-            # Convert string to ExtractOptions if needed
-            if isinstance(options, str):
-                options = ExtractOptions(instruction=options)
-
-            # Call local extract implementation
-            schema = None
-            if (
-                hasattr(options, "schema_definition")
-                and options.schema_definition != None
-            ):
-                # If a custom schema is provided, use it
-                if isinstance(options.schema_definition, type) and issubclass(
-                    options.schema_definition, BaseModel
-                ):
-                    schema = options.schema_definition
-
-            result = self._extract_handler.extract(
-                options,
-                request_id,
-                schema,
-            )
-            return result
 
         # Allow for no options to extract the entire page
         if options is None:
@@ -269,6 +231,53 @@ class SyncStagehandPage:
         # Otherwise, it should be an ExtractOptions object
         else:
             payload = options.model_dump(exclude_none=True, by_alias=True)
+
+            # If in LOCAL mode, use local implementation
+        if self._stagehand.env == "LOCAL":
+            # If we don't have an extract handler yet, create one
+            if not hasattr(self, "_extract_handler"):
+                self._extract_handler = ExtractHandler(
+                    self, self._stagehand, self._stagehand.system_prompt
+                )
+
+            # Allow for no options to extract the entire page
+            if options is None:
+                # Call local extract implementation with no options
+                result = self._extract_handler.extract(
+                    None,
+                    "request_id",
+                    None,  # Explicitly pass None for schema if no options
+                )
+                return result
+
+            # Convert string to ExtractOptions if needed
+            if isinstance(options, str):
+                options = ExtractOptions(instruction=options)
+
+            # Determine the schema to pass to the handler
+            schema_to_pass_to_handler = None
+            if (
+                hasattr(options, "schema_definition")
+                and options.schema_definition != DEFAULT_EXTRACT_SCHEMA
+            ):
+                if isinstance(options.schema_definition, type) and issubclass(
+                    options.schema_definition, BaseModel
+                ):
+                    # Case 1: Pydantic model class
+                    schema_to_pass_to_handler = options.schema_definition
+                elif isinstance(options.schema_definition, dict):
+                    # TODO: revisit this case to pass the json_schema since litellm has a bug when passing it directly
+                    # Case 2: Dictionary
+                    # Assume it's a direct JSON schema dictionary
+                    schema_to_pass_to_handler = options.schema_definition
+
+            # Call local extract implementation
+            result = self._extract_handler.extract(
+                options,
+                "request_id",
+                schema_to_pass_to_handler,
+            )
+            return result.data
 
         result = self._stagehand._execute("extract", payload)
         if isinstance(result, dict):
