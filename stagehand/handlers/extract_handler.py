@@ -1,12 +1,12 @@
 """Extract handler for performing data extraction from page elements using LLMs."""
 
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Optional, Type, TypeVar
 
 from pydantic import BaseModel
 
-from stagehand.a11y.utils import get_accessibility_tree, get_xpath_by_resolved_object_id
+from stagehand.a11y.utils import get_accessibility_tree
 from stagehand.llm.inference import extract as extract_inference
-from stagehand.schemas import ExtractOptions, ExtractResult
+from stagehand.types import ExtractOptions, ExtractResult
 from stagehand.utils import transform_url_strings_to_ids, inject_urls
 
 
@@ -97,31 +97,29 @@ class ExtractHandler:
         # Process extraction response
         result = extraction_response.get("data", {})
         metadata = extraction_response.get("metadata", {})
-        prompt_tokens = extraction_response.get("prompt_tokens", 0)
-        completion_tokens = extraction_response.get("completion_tokens", 0)
-        inference_time_ms = extraction_response.get("inference_time_ms", 0)
+        # TODO update metrics for token usage
+        # prompt_tokens = extraction_response.get("prompt_tokens", 0)
+        # completion_tokens = extraction_response.get("completion_tokens", 0)
+        # inference_time_ms = extraction_response.get("inference_time_ms", 0)
 
         # Inject URLs back into result if necessary
         if url_paths:
             inject_urls(result, url_paths, id_to_url_mapping)
 
-        self.logger.info(
-            "Extraction completed",
-            auxiliary={
-                "metadata": metadata,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "inference_time_ms": inference_time_ms,
-            },
-        )
+        if metadata.get("completed"):
+            self.logger.debug(
+                "Extraction completed successfully",
+                auxiliary={"result": result},
+            )
+        else:
+            self.logger.debug(
+                "Extraction incomplete after processing all data",
+                auxiliary={"result": result},
+            )
 
         # Create ExtractResult object
         return ExtractResult(
-            data=result,
-            metadata=metadata,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            inference_time_ms=inference_time_ms,
+            result
         )
 
     async def _extract_page_text(self) -> ExtractResult:
@@ -151,11 +149,9 @@ class ExtractHandler:
                 return getVisibleText(document.body).trim();
             }
         """)
+
+        #TODO: update metrics for token usage
         
         return ExtractResult(
-            data={"page_text": page_text},
-            metadata={"completed": True},
-            prompt_tokens=0,
-            completion_tokens=0,
-            inference_time_ms=0,
+            page_text
         ) 

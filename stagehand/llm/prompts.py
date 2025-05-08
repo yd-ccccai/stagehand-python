@@ -1,5 +1,4 @@
-import json
-from typing import Any, Optional
+from typing import Optional
 
 from stagehand.handlers.act_handler_utils import method_handler_map
 from stagehand.types.llm import ChatMessage
@@ -23,116 +22,88 @@ User Instructions:
 
 # extract
 def build_extract_system_prompt(
-    is_anthropic: bool = False, 
-    is_using_text_extract: bool = False,
-    user_provided_instructions: str = None
-) -> str:
-    """
-    Build the system prompt for extraction.
+    use_text_extract: bool = False,
+    user_provided_instructions: Optional[str] = None,
+) -> ChatMessage:
+    base_content = """You are extracting content on behalf of a user.
+If a user asks you to extract a 'list' of information, or 'all' information,
+YOU MUST EXTRACT ALL OF THE INFORMATION THAT THE USER REQUESTS.
 
-    Args:
-        is_anthropic: Whether we're using an Anthropic model
-        is_using_text_extract: Whether we're using text extraction
-        user_provided_instructions: Optional custom system instructions
+You will be given:
+1. An instruction
+2. """
 
-    Returns:
-        System prompt for extract
-    """
-    if user_provided_instructions:
-        return user_provided_instructions
 
-    human_prefix = "<human>: " if is_anthropic else ""
-    assistant_prefix = "<assistant>: " if is_anthropic else ""
-    
-    extract_instructions = f"""You are an AI assistant capable of extracting structured information from web pages.
+    content_detail = (
+        "A text representation of a webpage to extract information from."
+        if use_text_extract
+        else "A list of DOM elements to extract from."
+    )
 
-Your job is to extract specific information as requested by the user from the web page content that is provided.
+    instructions = (
+        f"Print the exact text from the {'text-rendered webpage' if use_text_extract else 'DOM+accessibility tree elements'} "
+        f"with all symbols, characters, and endlines as is.\n"
+        f"Print null or an empty string if no new information is found."
+    ).strip()
 
-The user will provide:
-1. An instruction about what information to extract
-2. A representation of the web page content
+    additional_instructions = (
+        """Once you are given the text-rendered webpage,
+you must thoroughly and meticulously analyze it. Be very careful to ensure that you
+do not miss any important information."""
+        if use_text_extract
+        else (
+            "If a user is attempting to extract links or URLs, you MUST respond with ONLY the IDs of the link elements.\n"
+            "Do not attempt to extract links directly from the text unless absolutely necessary. "
+        )
+    )
 
-You should:
-1. Carefully analyze the page content
-2. Extract the information according to the user's instructions
-3. Return the results in a structured format, following the required schema
+    user_instructions = build_user_instructions_string(
+        user_provided_instructions,
+    )
 
-Follow these guidelines:
-- Extract exactly what was asked for, no more and no less
-- If a piece of information is not in the page content, leave the corresponding field empty or null
-- Do not make up information or hallucinate data not present in the content
-- Be precise and accurate in your extraction
-"""
 
-    if is_using_text_extract:
-        extract_instructions += """
-Note: The page content provided includes positional information about where text appears on the page. This is represented as lines of text with annotations about their positions. Focus on extracting the relevant information while disregarding the positional details.
-"""
+    content_parts = [
+        f"{base_content}{content_detail}",
+        instructions,
+    ]
+    if additional_instructions:
+        content_parts.append(additional_instructions)
+    if user_instructions:
+        content_parts.append(user_instructions)
 
-    return extract_instructions
+    # Join parts with newlines, filter empty strings, then replace multiple spaces
+    full_content = "\n\n".join(filter(None, content_parts))
+    content = " ".join(full_content.split())
 
+
+    return ChatMessage(role="system", content=content)
 
 def build_extract_user_prompt(
-    instruction: str, dom_elements: str, is_anthropic: bool = False
-) -> str:
+    instruction: str, dom_elements: str
+) -> ChatMessage:
     """
     Build the user prompt for extraction.
 
     Args:
         instruction: The instruction for what to extract
         dom_elements: The DOM representation or text content
-        is_anthropic: Whether we're using an Anthropic model
 
     Returns:
         User prompt for extract
     """
-    human_prefix = "<human>: " if is_anthropic else ""
-    
-    if not instruction:
-        instruction = "Extract all the relevant information from this page."
-    
-    return f"""Instruction: {instruction}
+    content = f"""Instruction: {instruction}
+DOM: {dom_elements}"""
 
-Page content:
-{dom_elements}
-"""
+    return ChatMessage(role="user", content=content)
 
-
-refine_system_prompt = """You are tasked with refining and filtering information for the final output based on newly extracted and previously extracted content. Your responsibilities are:
-1. Remove exact duplicates for elements in arrays and objects.
-2. For text fields, append or update relevant text if the new content is an extension, replacement, or continuation.
-3. For non-text fields (e.g., numbers, booleans), update with new values if they differ.
-4. Add any completely new fields or objects ONLY IF they correspond to the provided schema.
-
-Return the updated content that includes both the previous content and the new, non-duplicate, or extended information."""
-
-
-def build_refine_system_prompt() -> ChatMessage:
-    return ChatMessage(role="system", content=refine_system_prompt)
-
-
-def build_refine_user_prompt(
-    instruction: str,
-    previously_extracted_content: dict[str, Any],
-    newly_extracted_content: dict[str, Any],
-) -> ChatMessage:
-    return ChatMessage(
-        role="user",
-        content=f"""Instruction: {instruction}
-Previously extracted content: {json.dumps(previously_extracted_content, indent=2)}
-Newly extracted content: {json.dumps(newly_extracted_content, indent=2)}
-Refined content:""",
-    )
-
-
-def build_metadata_system_prompt() -> str:
+def build_metadata_system_prompt() -> ChatMessage:
     """
     Build the system prompt for metadata extraction.
 
     Returns:
         System prompt for metadata
     """
-    return """You are an AI assistant that evaluates the completeness of information extraction.
+    prompt =  """You are an AI assistant that evaluates the completeness of information extraction.
 
 Given:
 1. An extraction instruction
@@ -147,6 +118,7 @@ Please respond with:
 - "progress": A brief summary of the extraction progress
 """
 
+    return ChatMessage(role="system", content=prompt)
 
 def build_metadata_prompt(
     instruction: str, extracted_data: dict, chunks_seen: int, chunks_total: int
@@ -163,7 +135,7 @@ def build_metadata_prompt(
     Returns:
         User prompt for metadata
     """
-    return f"""Extraction instruction: {instruction}
+    prompt = f"""Extraction instruction: {instruction}
 
 Extracted data: {extracted_data}
 
@@ -172,7 +144,7 @@ Chunks processed: {chunks_seen} of {chunks_total}
 Evaluate if this extraction is complete according to the instruction.
 """
 
-
+    return ChatMessage(role="user", content=prompt)
 # observe
 def build_observe_system_prompt(
     user_provided_instructions: Optional[str] = None,

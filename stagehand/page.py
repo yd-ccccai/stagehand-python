@@ -214,7 +214,7 @@ class StagehandPage:
 
     async def extract(
         self,
-        options: Union[str, ExtractOptions] = None
+        options: Union[str, ExtractOptions, None] = None
     ) -> ExtractResult:
         """
         Extract data using AI via the Stagehand server.
@@ -230,13 +230,20 @@ class StagehandPage:
         """
         await self.ensure_injection()
 
-        # If in LOCAL mode, use local implementation
+        # Otherwise use API implementation
+        # Allow for no options to extract the entire page
+        if options is None:
+            payload = {}
+        # Convert string to ExtractOptions if needed
+        elif isinstance(options, str):
+            options = ExtractOptions(instruction=options)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
+        # Otherwise, it should be an ExtractOptions object
+        else:
+            payload = options.model_dump(exclude_none=True, by_alias=True)
+        
+                # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":
-            # Create request ID
-            import uuid
-
-            request_id = str(uuid.uuid4())
-
             # If we don't have an extract handler yet, create one
             if not hasattr(self, "_extract_handler"):
                 self._extract_handler = ExtractHandler(self, self._stagehand, 
@@ -247,7 +254,7 @@ class StagehandPage:
                 # Call local extract implementation with no options
                 result = await self._extract_handler.extract(
                     None,
-                    request_id,
+                    "request_id",
                 )
                 return result
                 
@@ -264,22 +271,10 @@ class StagehandPage:
                     
             result = await self._extract_handler.extract(
                 options,
-                request_id,
+                "request_id",
                 schema,
             )
             return result
-
-        # Otherwise use API implementation
-        # Allow for no options to extract the entire page
-        if options is None:
-            payload = {}
-        # Convert string to ExtractOptions if needed
-        elif isinstance(options, str):
-            options = ExtractOptions(instruction=options)
-            payload = options.model_dump(exclude_none=True, by_alias=True)
-        # Otherwise, it should be an ExtractOptions object
-        else:
-            payload = options.model_dump(exclude_none=True, by_alias=True)
 
         lock = self._stagehand._get_lock_for_session()
         async with lock:

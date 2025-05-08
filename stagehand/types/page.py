@@ -1,7 +1,10 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
+
+class DEFAULT_EXTRACT_SCHEMA(BaseModel):
+    extraction: str
 
 class ObserveElementSchema(BaseModel):
     element_id: int
@@ -14,6 +17,10 @@ class ObserveElementSchema(BaseModel):
 
 class ObserveInferenceSchema(BaseModel):
     elements: list[ObserveElementSchema]
+
+class MetadataSchema(BaseModel):
+    completed: bool
+    progress: str
 
 
 class ActOptions(BaseModel):
@@ -90,6 +97,57 @@ class ObserveResult(BaseModel):
     backend_node_id: Optional[int] = None
     method: Optional[str] = None
     arguments: Optional[list[str]] = None
+
+    def __getitem__(self, key):
+        """
+        Enable dictionary-style access to attributes.
+        This allows usage like result["selector"] in addition to result.selector
+        """
+        return getattr(self, key)
+    
+
+class ExtractOptions(BaseModel):
+    """
+    Options for the 'extract' command.
+
+    Attributes:
+        instruction (str): Instruction specifying what data to extract using AI.
+        model_name (Optional[AvailableModel]): The model to use for processing.
+        selector (Optional[str]): CSS selector to limit extraction to.
+        schema_definition (Union[dict[str, Any], type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
+            Note: If passing a Pydantic model, invoke its .model_json_schema() method to ensure the schema is JSON serializable.
+        use_text_extract (Optional[bool]): Whether to use text-based extraction.
+        dom_settle_timeout_ms (Optional[int]): Additional time for DOM to settle before extraction.
+    """
+
+    instruction: str = Field(
+        ..., description="Instruction specifying what data to extract using AI."
+    )
+    model_name: Optional[str] = None
+    selector: Optional[str] = None
+    # IMPORTANT: If using a Pydantic model for schema_definition, please call its .model_json_schema() method
+    # to convert it to a JSON serializable dictionary before sending it with the extract command.
+    schema_definition: Union[dict[str, Any], type[BaseModel]] = Field(
+        default=DEFAULT_EXTRACT_SCHEMA,
+        description="A JSON schema or Pydantic model that defines the structure of the expected data.",
+    )
+    use_text_extract: Optional[bool] = None
+    dom_settle_timeout_ms: Optional[int] = None
+    model_client_options: Optional[dict[Any, Any]] = None
+
+
+class ExtractResult(BaseModel):
+    """
+    Result of the 'extract' command.
+
+    This is a generic model to hold extraction results of different types.
+    The actual fields will depend on the schema provided in ExtractOptions.
+    """
+
+    # This class is intentionally left without fields so it can accept
+    # any fields from the extraction result based on the schema
+
+    model_config = ConfigDict(extra="allow")  # Allow any extra fields
 
     def __getitem__(self, key):
         """

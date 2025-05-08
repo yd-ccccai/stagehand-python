@@ -23,6 +23,10 @@ from .page import (
     ObserveInferenceSchema,
     ObserveOptions,
     ObserveResult,
+    MetadataSchema,
+    DEFAULT_EXTRACT_SCHEMA,
+    ExtractOptions,
+    ExtractResult,
 )
 
 __all__ = [
@@ -42,4 +46,8 @@ __all__ = [
     "ActResult",
     "ObserveOptions",
     "ObserveResult",
+    "MetadataSchema",
+    "DEFAULT_EXTRACT_SCHEMA",
+    "ExtractOptions",
+    "ExtractResult",
 ]
