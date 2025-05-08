@@ -99,7 +99,7 @@ def setup_environment():
 
     # Check for required dependencies
     try:
-        import litellm
+        import litellm  # noqa: F401
 
         print("LiteLLM is available for LOCAL mode")
     except ImportError:
