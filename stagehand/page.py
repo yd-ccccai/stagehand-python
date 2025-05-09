@@ -88,7 +88,9 @@ class StagehandPage:
             result = await self._stagehand._execute("navigate", payload)
         return result
 
-    async def act(self, action_or_result: Union[str, ObserveResult], **kwargs) -> ActResult:
+    async def act(
+        self, action_or_result: Union[str, ObserveResult], **kwargs
+    ) -> ActResult:
         """
         Execute an AI action or a pre-observed action via the Stagehand server.
 
@@ -131,7 +133,7 @@ class StagehandPage:
         # This line might be reached if _execute returns something unexpected
         # Depending on error handling within _execute, consider raising here
         # For now, returning the raw result if it's not a dict
-        return result # Or potentially raise an error if result is not a dict
+        return result  # Or potentially raise an error if result is not a dict
 
     async def observe(self, instruction: str, **kwargs) -> list[ObserveResult]:
         """
@@ -162,10 +164,14 @@ class StagehandPage:
             # If single dict, wrap in list (should ideally be list from server)
             return [ObserveResult(**result)]
         # Handle unexpected return types
-        self._stagehand.logger.warning(f"Unexpected result type from observe: {type(result)}")
+        self._stagehand.logger.warning(
+            f"Unexpected result type from observe: {type(result)}"
+        )
         return []
 
-    async def extract(self, instruction: Optional[str] = None, **kwargs) -> ExtractResult:
+    async def extract(
+        self, instruction: Optional[str] = None, **kwargs
+    ) -> ExtractResult:
         """
         Extract data using AI via the Stagehand server.
 
@@ -187,7 +193,7 @@ class StagehandPage:
             options = ExtractOptions(instruction=instruction, **kwargs)
         else:
             # Allow extraction without instruction if other options (like schema) are provided
-            options = ExtractOptions(**kwargs) # schema_definition might be in kwargs
+            options = ExtractOptions(**kwargs)  # schema_definition might be in kwargs
 
         payload = options.model_dump(exclude_none=True, by_alias=True)
 
@@ -207,11 +213,13 @@ class StagehandPage:
             except Exception as e:
                 self._stagehand.logger.error(f"Failed to parse extract result: {e}")
                 # Return raw dict if parsing fails, or raise? Returning dict for now.
-                return result # type: ignore
+                return result  # type: ignore
         # Handle unexpected return types
-        self._stagehand.logger.warning(f"Unexpected result type from extract: {type(result)}")
+        self._stagehand.logger.warning(
+            f"Unexpected result type from extract: {type(result)}"
+        )
         # Return raw result if not dict or raise error
-        return result # type: ignore
+        return result  # type: ignore
 
     async def screenshot(self, options: Optional[dict] = None) -> str:
         """
