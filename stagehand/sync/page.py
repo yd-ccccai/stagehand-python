@@ -128,7 +128,9 @@ class SyncStagehandPage:
             # If single dict, wrap in list (should ideally be list from server)
             return [ObserveResult(**result)]
         # Handle unexpected return types
-        self._stagehand.logger.warning(f"Unexpected result type from observe: {type(result)}")
+        self._stagehand.logger.warning(
+            f"Unexpected result type from observe: {type(result)}"
+        )
         return []
 
     def extract(self, instruction: Optional[str] = None, **kwargs) -> ExtractResult:
@@ -163,10 +165,12 @@ class SyncStagehandPage:
                 return ExtractResult(**result)
             except Exception as e:
                 self._stagehand.logger.error(f"Failed to parse extract result: {e}")
-                return result # type: ignore
+                return result  # type: ignore
         # Handle unexpected return types
-        self._stagehand.logger.warning(f"Unexpected result type from extract: {type(result)}")
-        return result # type: ignore
+        self._stagehand.logger.warning(
+            f"Unexpected result type from extract: {type(result)}"
+        )
+        return result  # type: ignore
 
     def screenshot(self, options: Optional[dict] = None) -> str:
         """

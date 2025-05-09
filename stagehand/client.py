@@ -284,6 +284,7 @@ class Stagehand(StagehandBase):
             "x-bb-project-id": self.browserbase_project_id,
             "x-model-api-key": self.model_api_key,
             "Content-Type": "application/json",
+            "x-language": "python",
         }
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)

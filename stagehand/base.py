@@ -4,8 +4,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 from typing import Any, Callable, Optional
 
-from browserbase.types import SessionCreateParams as BrowserbaseSessionCreateParams
-
 from .config import StagehandConfig
 from .page import StagehandPage
 from .utils import default_log_handler

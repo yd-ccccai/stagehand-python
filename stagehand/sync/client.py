@@ -201,6 +201,7 @@ class Stagehand(StagehandBase):
             "x-bb-project-id": self.browserbase_project_id,
             "x-model-api-key": self.model_api_key,
             "Content-Type": "application/json",
+            "x-language": "python",
         }
 
         resp = self._client.post(
