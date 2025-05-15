@@ -13,6 +13,7 @@ from .base import StagehandBase
 from .config import StagehandConfig
 from .context import StagehandContext
 from .page import StagehandPage
+from .schemas import AgentConfig
 from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
@@ -93,7 +94,6 @@ class Stagehand(StagehandBase):
         self._context = None
         self._playwright_page = None
         self.page: Optional[StagehandPage] = None
-        self.agent = None
 
         self._initialized = False  # Flag to track if init() has run
         self._closed = False  # Flag to track if resources have been closed
@@ -191,11 +191,27 @@ class Stagehand(StagehandBase):
             self.page = await self.stagehand_context.new_page()
             self._playwright_page = self.page.page
 
-        # Initialize agent
-        self.logger.debug("Initializing Agent")
-        self.agent = Agent(self)
-
         self._initialized = True
+
+    def agent(self, agent_config: AgentConfig) -> Agent:
+        """
+        Create an agent instance configured with the provided options.
+
+        Args:
+            agent_config (AgentConfig): Configuration for the agent instance.
+                                          Provider must be specified or inferrable from the model.
+
+        Returns:
+            Agent: A configured Agent instance ready to execute tasks.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "Stagehand must be initialized with await init() before creating an agent."
+            )
+
+        self.logger.debug(f"Creating Agent instance with config: {agent_config}")
+        # Pass the required config directly to the Agent constructor
+        return Agent(self, agent_config=agent_config)
 
     async def close(self):
         """

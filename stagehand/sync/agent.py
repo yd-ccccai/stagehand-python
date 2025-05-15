@@ -19,72 +19,73 @@ class SyncAgent:
     Synchronous class to handle agent functionality in Stagehand
     """
 
-    def __init__(self, stagehand_client):
+    def __init__(self, stagehand_client, agent_config: AgentConfig):
         """
-        Initialize a SyncAgent instance.
+        Initialize a synchronous Agent instance.
 
         Args:
-            stagehand_client: The sync client used to interface with the Stagehand server.
+            stagehand_client: The synchronous client used to interface with the Stagehand server.
+            agent_config (AgentConfig): Configuration for the agent,
+                                          including provider, model, options, instructions.
         """
         self._stagehand = stagehand_client
+        self._config = agent_config
 
-    def execute(
-        self, agent_config: AgentConfig, execute_options: AgentExecuteOptions
-    ) -> AgentExecuteResult:
+        # Perform provider inference and validation
+        if self._config.model and not self._config.provider:
+            if self._config.model in MODEL_TO_PROVIDER_MAP:
+                self._config.provider = MODEL_TO_PROVIDER_MAP[self._config.model]
+            else:
+                self._stagehand.logger.warning(
+                    f"Could not infer provider for model: {self._config.model}"
+                )
+
+        # Ensure provider is correctly set as an enum if provided as a string
+        if self._config.provider and isinstance(self._config.provider, str):
+            try:
+                self._config.provider = AgentProvider(self._config.provider.lower())
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid provider: {self._config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}"
+                ) from e
+        elif not self._config.provider:
+            raise ValueError(
+                "Agent provider is required and could not be determined from the provided config."
+            )
+
+    def execute(self, execute_options: AgentExecuteOptions) -> AgentExecuteResult:
         """
-        Execute a task using an autonomous agent via the Stagehand server synchronously.
+        Execute a task using the configured autonomous agent via the Stagehand server (synchronously).
 
         Args:
-            agent_config (AgentConfig): Configuration for the agent, including provider and model.
             execute_options (AgentExecuteOptions): Options for execution, including the instruction.
 
         Returns:
             AgentExecuteResult: The result of the agent execution.
         """
-        # If provider is not set but model is, infer provider from model
-        if (
-            not agent_config.provider
-            and agent_config.model
-            and agent_config.model in MODEL_TO_PROVIDER_MAP
-        ):
-            agent_config.provider = MODEL_TO_PROVIDER_MAP[agent_config.model]
-
-        # Ensure provider is correctly set as an enum if provided as a string
-        if agent_config.provider and isinstance(agent_config.provider, str):
-            try:
-                agent_config.provider = AgentProvider(agent_config.provider.lower())
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid provider: {agent_config.provider}. Must be one of: {', '.join([p.value for p in AgentProvider])}"
-                ) from e
-
         payload = {
-            "agentConfig": agent_config.model_dump(exclude_none=True, by_alias=True),
+            "agentConfig": self._config.model_dump(exclude_none=True, by_alias=True),
             "executeOptions": execute_options.model_dump(
                 exclude_none=True, by_alias=True
             ),
         }
 
-        # Log the request details
-        self._stagehand._log("\n==== EXECUTING AGENT REQUEST ====", level=3)
-        self._stagehand._log(f"Agent Provider: {agent_config.provider}", level=3)
-        self._stagehand._log(f"Agent Model: {agent_config.model}", level=3)
-        self._stagehand._log(
-            f"Agent Instruction: {execute_options.instruction}", level=3
-        )
-        self._stagehand._log(f"Full Payload: {payload}", level=3)
-
+        # Use the synchronous _execute method
         result = self._stagehand._execute("agentExecute", payload)
 
         if isinstance(result, dict):
-            # Ensure all expected fields are present
-            # If not present in result, use defaults from AgentExecuteResult schema
             if "success" not in result:
                 raise ValueError("Response missing required field 'success'")
-
-            # Ensure completed is set with default if not present
             if "completed" not in result:
                 result["completed"] = False
-
+            if "message" not in result:
+                result["message"] = None
             return AgentExecuteResult(**result)
-        return result
+        elif result is None:
+            return AgentExecuteResult(
+                success=False,
+                completed=False,
+                message="No result received from server",
+            )
+        else:
+            raise TypeError(f"Unexpected result type from server: {type(result)}")
