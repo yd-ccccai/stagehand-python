@@ -1,9 +1,12 @@
 """LLM client for model interactions."""
 
 import logging
-from typing import Any, Optional
+import time
+from typing import Any, Callable, Optional
 
 import litellm
+
+from stagehand.metrics import start_inference_timer, get_inference_time_ms
 
 # Configure logger for the module
 logger = logging.getLogger(__name__)
@@ -19,6 +22,7 @@ class LLMClient:
         self,
         api_key: Optional[str] = None,
         default_model: Optional[str] = None,
+        metrics_callback: Optional[Callable[[Any, int, Optional[str]], None]] = None,
         **kwargs: Any,  # To catch other potential litellm global settings
     ):
         """
@@ -32,10 +36,12 @@ class LLMClient:
                      not be desired if using multiple providers.
             default_model: The default model to use if none is specified in chat_completion
                            (e.g., "gpt-4o", "claude-3-opus-20240229").
+            metrics_callback: Optional callback to track metrics from responses
             **kwargs: Additional global settings for litellm (e.g., api_base).
                       See litellm documentation for available settings.
         """
         self.default_model = default_model
+        self.metrics_callback = metrics_callback
 
         # Warning:Prefer environment variables for specific providers.
         if api_key:
@@ -59,6 +65,7 @@ class LLMClient:
         *,
         messages: list[dict[str, str]],
         model: Optional[str] = None,
+        function_name: Optional[str] = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """
@@ -68,6 +75,8 @@ class LLMClient:
             messages: A list of message dictionaries, e.g., [{"role": "user", "content": "Hello"}].
             model: The specific model to use (e.g., "gpt-4o", "claude-3-opus-20240229").
                    Overrides the default_model if provided.
+            function_name: The name of the Stagehand function calling this method (ACT, OBSERVE, etc.)
+                   Used for metrics tracking.
             **kwargs: Additional parameters to pass directly to litellm.completion
                       (e.g., temperature, max_tokens, stream=True, specific provider arguments).
 
@@ -102,8 +111,19 @@ class LLMClient:
             f"Calling litellm.completion with model={completion_model} and params: {filtered_params}"
         )
         try:
+            # Start tracking inference time
+            start_time = start_inference_timer()
+
             # Use litellm's completion function
             response = litellm.completion(**filtered_params)
+
+            # Calculate inference time
+            inference_time_ms = get_inference_time_ms(start_time)
+
+            # Update metrics if callback is provided
+            if self.metrics_callback:
+                self.metrics_callback(response, inference_time_ms, function_name)
+
             return response
 
         except Exception as e:

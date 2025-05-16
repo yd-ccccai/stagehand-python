@@ -5,6 +5,7 @@ from typing import Optional, TypeVar
 from pydantic import BaseModel
 
 from stagehand.llm.inference import extract as extract_inference
+from stagehand.metrics import StagehandFunctionName
 from stagehand.sync.a11y.utils import get_accessibility_tree
 from stagehand.types import ExtractOptions, ExtractResult
 from stagehand.utils import inject_urls, transform_url_strings_to_ids
@@ -67,6 +68,10 @@ class ExtractHandler:
             f"Starting extraction with instruction: '{instruction}'", category="extract"
         )
 
+        # Start inference timer if available in client
+        if hasattr(self.stagehand, "start_inference_timer"):
+            self.stagehand.start_inference_timer()
+
         # Wait for DOM to settle
         self.stagehand_page._wait_for_settled_dom()
 
@@ -102,13 +107,22 @@ class ExtractHandler:
             log_inference_to_file=False,  # TODO: Implement logging to file if needed
         )
 
+        # Extract metrics from response and update them directly
+        prompt_tokens = extraction_response.get("prompt_tokens", 0)
+        completion_tokens = extraction_response.get("completion_tokens", 0)
+        inference_time_ms = extraction_response.get("inference_time_ms", 0)
+
+        # Update metrics directly using the Stagehand client
+        self.stagehand.update_metrics(
+            StagehandFunctionName.EXTRACT,
+            prompt_tokens,
+            completion_tokens,
+            inference_time_ms,
+        )
+
         # Process extraction response
         raw_data_dict = extraction_response.get("data", {})
         metadata = extraction_response.get("metadata", {})
-        # TODO update metrics for token usage
-        # prompt_tokens = extraction_response.get("prompt_tokens", 0)
-        # completion_tokens = extraction_response.get("completion_tokens", 0)
-        # inference_time_ms = extraction_response.get("inference_time_ms", 0)
 
         # Inject URLs back into result if necessary
         if url_paths:

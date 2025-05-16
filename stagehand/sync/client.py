@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
@@ -18,6 +19,8 @@ from playwright.sync_api import Page as PlaywrightPage
 from ..base import StagehandBase
 from ..config import StagehandConfig
 from ..llm.client import LLMClient
+from ..metrics import StagehandFunctionName, start_inference_timer, get_inference_time_ms
+from ..metrics import StagehandMetrics
 from ..utils import StagehandLogger, convert_dict_keys_to_camel_case
 from .agent import SyncAgent
 from .context import SyncStagehandContext
@@ -52,6 +55,7 @@ class Stagehand(StagehandBase):
         use_rich_logging: bool = True,
         env: Literal["BROWSERBASE", "LOCAL"] = None,
         local_browser_launch_options: Optional[dict[str, Any]] = None,
+        metrics_callback: Optional[Callable[[StagehandFunctionName, int, int, int], None]] = None,
     ):
         super().__init__(
             config=config,
@@ -78,6 +82,13 @@ class Stagehand(StagehandBase):
             None  # To store path if created temporarily
         )
         self.timeout_settings = timeout_settings or 180.0  # requests timeout in seconds
+
+        # Initialize metrics tracking callback
+        self.metrics_callback = metrics_callback
+        
+        # Initialize metrics tracking
+        self.metrics = StagehandMetrics()
+        self._inference_start_time = 0
 
         # Validate env
         if self.env not in ["BROWSERBASE", "LOCAL"]:
@@ -129,6 +140,7 @@ class Stagehand(StagehandBase):
         self.llm = LLMClient(
             api_key=self.model_api_key,
             default_model=self.model_name,
+            metrics_callback=self._handle_llm_metrics,
             **self.model_client_options,
         )
 
@@ -708,3 +720,159 @@ class Stagehand(StagehandBase):
             self.logger.debug("Stealth init script added successfully (sync).")
         except Exception as e:
             self.logger.error(f"Failed to add stealth init script (sync): {str(e)}")
+
+    def start_inference_timer(self) -> float:
+        """Start timing inference latency.
+        
+        Returns:
+            The start time as a float timestamp.
+        """
+        self._inference_start_time = time.time()
+        return self._inference_start_time
+    
+    def get_inference_time_ms(self) -> int:
+        """Get elapsed inference time in milliseconds.
+        
+        Returns:
+            The elapsed time in milliseconds.
+        """
+        if self._inference_start_time == 0:
+            return 0
+        inference_time = int((time.time() - self._inference_start_time) * 1000)
+        self._inference_start_time = 0  # Reset the timer
+        return inference_time
+
+    def update_metrics(
+        self,
+        function_name: StagehandFunctionName,
+        prompt_tokens: int,
+        completion_tokens: int,
+        inference_time_ms: int,
+    ):
+        """
+        Update metrics based on function name and token usage.
+
+        Args:
+            function_name: The function that generated the metrics
+            prompt_tokens: Number of prompt tokens used
+            completion_tokens: Number of completion tokens used
+            inference_time_ms: Time taken for inference in milliseconds
+        """
+        if function_name == StagehandFunctionName.ACT:
+            self.metrics.act_prompt_tokens += prompt_tokens
+            self.metrics.act_completion_tokens += completion_tokens
+            self.metrics.act_inference_time_ms += inference_time_ms
+        elif function_name == StagehandFunctionName.EXTRACT:
+            self.metrics.extract_prompt_tokens += prompt_tokens
+            self.metrics.extract_completion_tokens += completion_tokens
+            self.metrics.extract_inference_time_ms += inference_time_ms
+        elif function_name == StagehandFunctionName.OBSERVE:
+            self.metrics.observe_prompt_tokens += prompt_tokens
+            self.metrics.observe_completion_tokens += completion_tokens
+            self.metrics.observe_inference_time_ms += inference_time_ms
+        elif function_name == StagehandFunctionName.AGENT:
+            self.metrics.agent_prompt_tokens += prompt_tokens
+            self.metrics.agent_completion_tokens += completion_tokens
+            self.metrics.agent_inference_time_ms += inference_time_ms
+
+        # Always update totals
+        self.metrics.total_prompt_tokens += prompt_tokens
+        self.metrics.total_completion_tokens += completion_tokens
+        self.metrics.total_inference_time_ms += inference_time_ms
+        
+        # Call metrics callback if provided
+        if self.metrics_callback:
+            self.metrics_callback(function_name, prompt_tokens, completion_tokens, inference_time_ms)
+
+    def update_metrics_from_response(
+        self,
+        function_name: StagehandFunctionName,
+        response: Any,
+        inference_time_ms: Optional[int] = None,
+    ):
+        """
+        Extract and update metrics from a litellm response.
+
+        Args:
+            function_name: The function that generated the response
+            response: litellm response object
+            inference_time_ms: Optional inference time if already calculated
+        """
+        try:
+            # Check if response has usage information
+            if hasattr(response, "usage") and response.usage:
+                prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
+                completion_tokens = getattr(response.usage, "completion_tokens", 0)
+
+                # Use provided inference time or calculate from timer
+                time_ms = inference_time_ms or self.get_inference_time_ms()
+
+                self.update_metrics(
+                    function_name, prompt_tokens, completion_tokens, time_ms
+                )
+
+                # Log the usage at debug level
+                self.logger.debug(
+                    f"Updated metrics for {function_name}: {prompt_tokens} prompt tokens, "
+                    f"{completion_tokens} completion tokens, {time_ms}ms"
+                )
+                self.logger.debug(
+                    f"Total metrics: {self.metrics.total_prompt_tokens} prompt tokens, "
+                    f"{self.metrics.total_completion_tokens} completion tokens, "
+                    f"{self.metrics.total_inference_time_ms}ms"
+                )
+            else:
+                # Try to extract from _hidden_params or other locations
+                hidden_params = getattr(response, "_hidden_params", {})
+                if hidden_params and "usage" in hidden_params:
+                    usage = hidden_params["usage"]
+                    prompt_tokens = usage.get("prompt_tokens", 0)
+                    completion_tokens = usage.get("completion_tokens", 0)
+
+                    # Use provided inference time or calculate from timer
+                    time_ms = inference_time_ms or self.get_inference_time_ms()
+
+                    self.update_metrics(
+                        function_name, prompt_tokens, completion_tokens, time_ms
+                    )
+
+                    # Log the usage at debug level
+                    self.logger.debug(
+                        f"Updated metrics from hidden_params for {function_name}: {prompt_tokens} prompt tokens, "
+                        f"{completion_tokens} completion tokens, {time_ms}ms"
+                    )
+                    self.logger.debug(
+                        f"Total metrics: {self.metrics.total_prompt_tokens} prompt tokens, "
+                        f"{self.metrics.total_completion_tokens} completion tokens, "
+                        f"{self.metrics.total_inference_time_ms}ms"
+                    )
+        except Exception as e:
+            self.logger.debug(f"Failed to update metrics from response: {str(e)}")
+
+    def _handle_llm_metrics(
+        self, response: Any, inference_time_ms: int, function_name=None
+    ):
+        """
+        Callback to handle metrics from LLM responses.
+
+        Args:
+            response: The litellm response object
+            inference_time_ms: Time taken for inference in milliseconds
+            function_name: The function that generated the metrics (name or enum value)
+        """
+        # Default to AGENT only if no function_name is provided
+        if function_name is None:
+            function_enum = StagehandFunctionName.AGENT
+        # Convert string function_name to enum if needed
+        elif isinstance(function_name, str):
+            try:
+                function_enum = getattr(StagehandFunctionName, function_name.upper())
+            except (AttributeError, KeyError):
+                # If conversion fails, default to AGENT
+                function_enum = StagehandFunctionName.AGENT
+        else:
+            # Use the provided enum value
+            function_enum = function_name
+
+        # Update metrics from the response
+        self.update_metrics_from_response(function_enum, response, inference_time_ms)
