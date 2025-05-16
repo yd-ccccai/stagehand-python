@@ -28,6 +28,9 @@ from .page import (
     ObserveOptions,
     ObserveResult,
 )
+from .agent import (
+    AgentConfig,
+)
 
 __all__ = [
     "AXProperty",
@@ -50,4 +53,5 @@ __all__ = [
     "DEFAULT_EXTRACT_SCHEMA",
     "ExtractOptions",
     "ExtractResult",
+    "AgentConfig",
 ]
