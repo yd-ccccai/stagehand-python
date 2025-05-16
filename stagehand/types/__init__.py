@@ -54,4 +54,6 @@ __all__ = [
     "ExtractOptions",
     "ExtractResult",
     "AgentConfig",
+    "AgentExecuteOptions",
+    "AgentResult",
 ]
