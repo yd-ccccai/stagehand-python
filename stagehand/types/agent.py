@@ -68,6 +68,7 @@ class MoveAction(BaseModel):
 
 class WaitAction(BaseModel):
     type: Literal["wait"]
+    miliseconds: Optional[int] = 0
     # No specific args, implies a default wait time
 
 
@@ -103,10 +104,11 @@ AgentActionType = RootModel[
         MoveAction,
         WaitAction,
         ScreenshotAction,
-        FunctionAction, 
+        FunctionAction,
         KeyAction,
-      ]
+    ]
 ]
+
 
 class AgentAction(BaseModel):
     action_type: str
@@ -114,6 +116,7 @@ class AgentAction(BaseModel):
     action: AgentActionType
     status: str
     step: Optional[list[dict[str, Any]]]
+
 
 class AgentUsage(BaseModel):
     input_tokens: int

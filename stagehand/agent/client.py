@@ -1,22 +1,31 @@
 from abc import ABC, abstractmethod
-from typing import Any, Tuple, Optional
+from typing import Any, Optional, Tuple
 
 # Forward declaration or direct import. Assuming direct import is fine.
 # If circular dependency issues arise, a forward declaration string might be needed for CUAHandler type hint.
 from ..handlers.cua_handler import CUAHandler
-from ..types.agent import AgentExecuteOptions, AgentResult, AgentAction, AgentConfig
+from ..types.agent import AgentAction, AgentConfig, AgentExecuteOptions, AgentResult
 
 
 class AgentClient(ABC):
-    def __init__(self, model: str, instructions: Optional[str], config: Optional[AgentConfig], logger: Any, handler: CUAHandler):
+    def __init__(
+        self,
+        model: str,
+        instructions: Optional[str],
+        config: Optional[AgentConfig],
+        logger: Any,
+        handler: CUAHandler,
+    ):
         self.model = model
         self.instructions = instructions  # System prompt/base instructions
-        self.config = config if config else AgentConfig() # Ensure config is never None
+        self.config = config if config else AgentConfig()  # Ensure config is never None
         self.logger = logger
-        self.handler: CUAHandler = handler # Client holds a reference to the handler
+        self.handler: CUAHandler = handler  # Client holds a reference to the handler
 
     @abstractmethod
-    async def run_task(self, instruction: str, options: Optional[AgentExecuteOptions]) -> AgentResult:
+    async def run_task(
+        self, instruction: str, options: Optional[AgentExecuteOptions]
+    ) -> AgentResult:
         """
         Manages the entire multi-step interaction with the CUA provider.
         This includes:
@@ -31,7 +40,9 @@ class AgentClient(ABC):
         pass
 
     @abstractmethod
-    def _format_initial_messages(self, instruction: str, screenshot_base64: Optional[str]) -> list[Any]:
+    def _format_initial_messages(
+        self, instruction: str, screenshot_base64: Optional[str]
+    ) -> list[Any]:
         """
         Prepares the initial list of messages to send to the CUA provider.
         Specific to each provider's API format.
@@ -39,7 +50,9 @@ class AgentClient(ABC):
         pass
 
     @abstractmethod
-    def _process_provider_response(self, response: Any) -> Tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
+    def _process_provider_response(
+        self, response: Any
+    ) -> Tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
         """
         Parses the raw response from the CUA provider.
         Returns:
@@ -51,7 +64,9 @@ class AgentClient(ABC):
         pass
 
     @abstractmethod
-    def _format_action_feedback(self, action: AgentAction, action_result: dict, new_screenshot_base64: str) -> list[Any]:
+    def _format_action_feedback(
+        self, action: AgentAction, action_result: dict, new_screenshot_base64: str
+    ) -> list[Any]:
         """
         Formats the feedback to the provider after an action is performed.
         This typically includes the result of the action and the new page state (screenshot).
@@ -67,4 +82,3 @@ class AgentClient(ABC):
     def key_to_playwright(self, key: str) -> str:
         """Convert a key to a playwright key if needed by the client before creating an AgentAction."""
         pass
-
