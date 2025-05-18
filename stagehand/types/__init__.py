@@ -13,6 +13,9 @@ from .a11y import (
     PlaywrightMethodNotSupportedError,
     TreeResult,
 )
+from .agent import (
+    AgentConfig,
+)
 from .llm import (
     ChatMessage,
 )
@@ -27,9 +30,6 @@ from .page import (
     ObserveInferenceSchema,
     ObserveOptions,
     ObserveResult,
-)
-from .agent import (
-    AgentConfig,
 )
 
 __all__ = [

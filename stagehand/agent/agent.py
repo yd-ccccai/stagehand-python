@@ -1,81 +1,97 @@
-from typing import Union
+from typing import Union, Optional, Type
 
-from ..types.agent import AgentConfig, AgentExecuteOptions, AgentResult
+from ..handlers.cua_handler import CUAHandler
 from ..schemas import AgentProvider
+from ..types.agent import AgentConfig, AgentExecuteOptions, AgentResult, AgentAction, AgentUsage
+from .anthropic_cua import AnthropicCUAClient
 from .client import AgentClient
 from .openai_cua import OpenAICUAClient
-from .anthropic_cua import AnthropicCUAClient
-from ..handlers.cua_handler import CUAHandler
 
-MODEL_TO_PROVIDER_MAP: dict[str, AgentProvider] = {
-    "computer-use-preview": AgentProvider.OPENAI,
-    "claude-3-5-sonnet-20240620": AgentProvider.ANTHROPIC,
-    "claude-3-7-sonnet-20250219": AgentProvider.ANTHROPIC,
+MODEL_TO_CLIENT_CLASS_MAP: dict[str, Type[AgentClient]] = {
+    "computer-use-preview": OpenAICUAClient,
+    "claude-3-5-sonnet-20240620": AnthropicCUAClient,
+    "claude-3-7-sonnet-20250219": AnthropicCUAClient,
 }
 
+AGENT_METRIC_FUNCTION_NAME = "AGENT_EXECUTE_TASK"
+
 class Agent:
-    
+
     def __init__(self, stagehand_client, **kwargs):
         self.stagehand = stagehand_client
-        self.config = AgentConfig(**kwargs)
-        self.model = self.config.model
-        self.instructions = self.config.instructions
-        # Provisioning for non-cua
-        self.client = self._get_client() if self.stagehand.env == "LOCAL" else None
-        # TODO: init handler
-        self.handler = CUAHandler(stagehand=self.stagehand, client=self.client)
-    
-    # Currently only supporting CUA models
+        self.config = AgentConfig(**kwargs) if kwargs else AgentConfig()
+        self.logger = self.stagehand.logger
+        
+        if not hasattr(self.stagehand, 'page') or not hasattr(self.stagehand.page, '_page'):
+            self.logger.error("Stagehand page object not available for CUAHandler initialization.")
+            raise ValueError("Stagehand page not initialized. Cannot create Agent.")
+
+        self.cua_handler = CUAHandler(
+            stagehand=self.stagehand, 
+            page=self.stagehand.page._page,
+            logger=self.logger
+        )
+
+        self.client: AgentClient = self._get_client()
+
     def _get_client(self) -> AgentClient:
-        provider = MODEL_TO_PROVIDER_MAP.get(self.model)
-        if not provider:
-            raise ValueError(f"Unsupported model: {self.model}")
-        if provider == AgentProvider.OPENAI:
-            return OpenAICUAClient(
-                model=self.model, 
-                instructions=self.instructions, 
-                config=self.config
-              )
-        elif provider == AgentProvider.ANTHROPIC:
-            return AnthropicCUAClient(
-                model=self.model, 
-                instructions=self.instructions, 
-                config=self.config
-              )
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
+        ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)
+        if not ClientClass:
+            self.logger.error(f"Unsupported model or client not mapped: {self.config.model}")
+            raise ValueError(f"Unsupported model or client not mapped: {self.config.model}")
+        
+        return ClientClass(
+            model=self.config.model,
+            instructions=self.config.instructions if self.config.instructions else "Your browser is in full screen mode. There is no search bar, or navigation bar, or shortcut to control it. You can use the goto tool to navigate to different urls. Do not try to access a top navigation bar or other browser features.",
+            config=self.config,
+            logger=self.logger,
+            handler=self.cua_handler
+        )
 
-    async def execute(self, options_or_instruction: Union[AgentExecuteOptions, str]) -> AgentResult:
-        """
-        Execute a task based on the provided options or instruction string.
+    async def execute(
+        self, options_or_instruction: Union[AgentExecuteOptions, str]
+    ) -> AgentResult:
+        
+        options: Optional[AgentExecuteOptions] = None
+        instruction: str
 
-        Args:
-            instruction (str): The instruction to execute.
-            options (AgentExecuteOptions): The options for the execution.
-
-        Returns:
-            AgentResult: The result of the execution.
-        """
         if isinstance(options_or_instruction, str):
             instruction = options_or_instruction
-            options: AgentExecuteOptions = {"instruction": instruction} # type: ignore
+            options = AgentExecuteOptions(instruction=instruction) # type: ignore
+        elif isinstance(options_or_instruction, dict):
+            options = AgentExecuteOptions(**options_or_instruction)
+            instruction = options.instruction
         else:
             options = options_or_instruction
-            instruction = options["instruction"]
+            instruction = options.instruction
 
-        self.stagehand.logger.info(f"StagehandAgent executing instruction: {instruction}")
-        
-        agent_response = await self.handler.execute(instruction)
-        self.stagehand.logger.info(f"Agent response: {agent_response}")
+        if not instruction:
+            self.logger.error("No instruction provided for agent execution.")
+            return AgentResult(success=False, message="No instruction provided.", completed=True, actions=[], usage={}) # type: ignore
 
-        # For now, let's assume agent_response is already in AgentResult format or adaptable
-        # In reality, this would involve parsing the client's response, extracting actions, etc.
-        if isinstance(agent_response, dict) and "actions" in agent_response: # very basic check
-             return agent_response # type: ignore
+        self.logger.info(f"Agent starting execution for instruction: '{instruction}'", category="agent")
+
+        try:
+            agent_result = await self.client.run_task(instruction=instruction, options=options)
+        except Exception as e:
+            self.logger.error(f"Exception during client.run_task: {e}", category="agent")
+            empty_usage = AgentUsage(input_tokens=0, output_tokens=0, inference_time_ms=0)
+            return AgentResult(
+                success=False, 
+                message=f"Agent execution failed: {str(e)}", 
+                result=f"Error: {str(e)}",
+                completed=True, 
+                actions=[], 
+                usage=empty_usage
+            )
         
-        # Fallback for a stub implementation
-        return {
-            "actions": [],
-            "result": f"Task '{instruction}' processed (stub response).",
-            "usage": {"input_tokens": 0, "output_tokens": 0, "inference_time_ms": 0}
-        } 
+        if agent_result.usage:
+             self.stagehand.update_metrics(
+                 AGENT_METRIC_FUNCTION_NAME,
+                 agent_result.usage.get("input_tokens", 0),
+                 agent_result.usage.get("output_tokens", 0),
+                 agent_result.usage.get("inference_time_ms", 0),
+             )
+        
+        self.logger.info(f"Agent execution finished. Success: {agent_result.success}. Message: {agent_result.message}", category="agent")
+        return agent_result
