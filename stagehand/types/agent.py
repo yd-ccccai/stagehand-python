@@ -112,10 +112,10 @@ AgentActionType = RootModel[
 
 class AgentAction(BaseModel):
     action_type: str
-    reasoning: Optional[str]
+    reasoning: Optional[str] = None
     action: AgentActionType
-    status: str
-    step: Optional[list[dict[str, Any]]]
+    status: Optional[str] = None
+    step: Optional[list[dict[str, Any]]] = None
 
 
 class AgentUsage(BaseModel):
