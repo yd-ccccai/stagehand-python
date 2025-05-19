@@ -148,10 +148,8 @@ class AnthropicCUAClient(AgentClient):
                     tools=self.tools,
                     betas=["computer-use-2025-01-24"],
                 )
-                self.logger.info(f"Anthropic response: {response}")
                 end_time = asyncio.get_event_loop().time()
                 total_inference_time_ms += int((end_time - start_time) * 1000)
-                self.logger.info(f"Total inference time: {total_inference_time_ms}")
                 if response.usage:
                     total_input_tokens += response.usage.input_tokens or 0
                     total_output_tokens += response.usage.output_tokens or 0
@@ -316,22 +314,23 @@ class AnthropicCUAClient(AgentClient):
     def _convert_tool_use_to_agent_action(
         self, tool_name: str, tool_input: dict[str, Any]
     ) -> Optional[AgentAction]:
-        if tool_name != "computer":
+        if tool_name != "computer" and tool_name != "goto":
             self.logger.warning(
                 f"Unsupported tool name from Anthropic: {tool_name}",
                 category=StagehandFunctionName.AGENT,
             )
             return None
 
-        action_type_str = tool_input.get("action")
+        if tool_name == "goto":
+            action_type_str = "function"
+        else:
+            action_type_str = tool_input.get("action")
         if not action_type_str:
             self.logger.error(
                 "Missing 'action' in Anthropic computer tool_input",
                 category=StagehandFunctionName.AGENT,
             )
             return None
-
-        self.logger.info(f"Action type: {action_type_str}")
 
         action_model_payload: Optional[AgentActionType] = None
         reasoning = tool_input.get("reasoning")
@@ -527,21 +526,22 @@ class AnthropicCUAClient(AgentClient):
                 )
                 action_type_str = "screenshot"  # Normalize
 
-            elif action_type_str == "goto":
-                url = tool_input.get("url")
-                if url:
-                    action_model_payload = AgentActionType(
-                        type="function",
-                        name="goto",
-                        arguments=FunctionArguments(url=url),
-                    )
-                    action_type_str = "function"
-                else:
-                    self.logger.warning(
-                        "Goto action from Anthropic missing URL",
-                        category=StagehandFunctionName.AGENT,
-                    )
-                    return None
+            elif action_type_str == "function":
+                if tool_name == "goto":
+                    url = tool_input.get("url")
+                    if url:
+                        action_model_payload = AgentActionType(
+                            type="function",
+                            name="goto",
+                            arguments=FunctionArguments(url=url),
+                        )
+                        action_type_str = "function"
+                    else:
+                        self.logger.warning(
+                            "Goto action from Anthropic missing URL",
+                            category=StagehandFunctionName.AGENT,
+                        )
+                        return None
             else:
                 self.logger.warning(
                     f"Unsupported action type '{action_type_str}' from Anthropic computer tool.",
