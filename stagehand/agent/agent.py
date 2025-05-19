@@ -72,7 +72,7 @@ class Agent:
 
         if isinstance(options_or_instruction, str):
             instruction = options_or_instruction
-            options = AgentExecuteOptions(instruction=instruction)  # type: ignore
+            options = AgentExecuteOptions(instruction=instruction)
         elif isinstance(options_or_instruction, dict):
             options = AgentExecuteOptions(**options_or_instruction)
             instruction = options.instruction
@@ -82,7 +82,9 @@ class Agent:
 
         if not instruction:
             self.logger.error("No instruction provided for agent execution.")
-            return AgentResult(success=False, message="No instruction provided.", completed=True, actions=[], usage={})  # type: ignore
+            return AgentResult(
+                message="No instruction provided.", completed=True, actions=[], usage={}
+            )
 
         self.logger.info(
             f"Agent starting execution for instruction: '{instruction}'",
@@ -91,7 +93,9 @@ class Agent:
 
         try:
             agent_result = await self.client.run_task(
-                instruction=instruction, options=options
+                instruction=instruction,
+                max_steps=self.config.max_steps,
+                options=options,
             )
         except Exception as e:
             self.logger.error(
@@ -101,9 +105,7 @@ class Agent:
                 input_tokens=0, output_tokens=0, inference_time_ms=0
             )
             return AgentResult(
-                success=False,
-                message=f"Agent execution failed: {str(e)}",
-                result=f"Error: {str(e)}",
+                message=f"Error: {str(e)}",
                 completed=True,
                 actions=[],
                 usage=empty_usage,
@@ -120,7 +122,14 @@ class Agent:
             pass  # Placeholder if metrics are to be handled differently or not at all
 
         self.logger.info(
-            f"Agent execution finished. Success: {agent_result.success}. Message: {agent_result.message}",
+            f"Agent execution finished. Success: {agent_result.completed}. Message: {agent_result.message}",
             category="agent",
         )
+        # To clean up pydantic model output
+        actions_repr = [action.root for action in agent_result.actions]
+        self.logger.debug(
+            f"Agent actions: {actions_repr}",
+            category="agent",
+        )
+        agent_result.actions = actions_repr
         return agent_result

@@ -126,8 +126,9 @@ class AgentUsage(BaseModel):
 
 class AgentResult(BaseModel):
     actions: list[AgentActionType]
-    result: Optional[str]
+    message: Optional[str]
     usage: Optional[AgentUsage]
+    completed: bool
 
 
 class ActionExecutionResult(BaseModel):

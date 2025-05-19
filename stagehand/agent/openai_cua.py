@@ -56,7 +56,9 @@ class OpenAICUAClient(AgentClient):
                     "properties": {
                         "url": {
                             "type": "string",
-                            "description": "The URL to navigate to",
+                            "description": (
+                                "The URL to navigate to. Provide a full URL, including the protocol (e.g., https://www.google.com)."
+                            ),
                         },
                     },
                     "required": ["url"],
@@ -69,11 +71,6 @@ class OpenAICUAClient(AgentClient):
                 "environment": "browser",
             },
         ]
-        self.max_steps = (
-            self.config.max_steps
-            if self.config and self.config.max_steps is not None
-            else 20
-        )
         self.last_openai_tool_calls: Optional[list[Any]] = None
 
     def format_screenshot(self, screenshot_base64: str) -> dict:
@@ -155,9 +152,6 @@ class OpenAICUAClient(AgentClient):
         self.last_openai_tool_calls = None  # Reset
 
         if computer_call_item:
-            self.logger.info(
-                f"Received computer_call: {computer_call_item.id}", category="agent"
-            )
             self.last_openai_tool_calls = [
                 {
                     "type": "computer_call",
@@ -353,7 +347,10 @@ class OpenAICUAClient(AgentClient):
         ]
 
     async def run_task(
-        self, instruction: str, options: Optional[AgentExecuteOptions] = None
+        self,
+        instruction: str,
+        max_steps: int = 20,
+        options: Optional[AgentExecuteOptions] = None,
     ) -> AgentResult:
         self.logger.info(f"OpenAI CUA starting task: '{instruction}'", category="agent")
 
@@ -362,11 +359,9 @@ class OpenAICUAClient(AgentClient):
                 "CUAHandler not available for OpenAIClient.", category="agent"
             )
             return AgentResult(
-                success=False,
-                message="Internal error: Handler not set.",
-                completed=True,
+                completed=False,
                 actions=[],
-                result="Internal error: Handler not set.",
+                message="Internal error: Handler not set.",
                 usage={"input_tokens": 0, "output_tokens": 0, "inference_time_ms": 0},
             )
 
@@ -382,9 +377,9 @@ class OpenAICUAClient(AgentClient):
         total_output_tokens = 0
         total_inference_time_ms = 0  # Placeholder
 
-        for step_count in range(self.max_steps):
+        for step_count in range(max_steps):
             self.logger.info(
-                f"OpenAI CUA - Step {step_count + 1}/{self.max_steps}",
+                f"OpenAI CUA - Step {step_count + 1}/{max_steps}",
                 category="agent",
                 auxiliary={"current_input_items_count": len(current_input_items)},
             )
@@ -413,10 +408,8 @@ class OpenAICUAClient(AgentClient):
                     "inference_time_ms": total_inference_time_ms,
                 }
                 return AgentResult(
-                    success=False,
                     actions=[act.action for act in actions_taken if act.action],
                     message=f"OpenAI API error: {e}",
-                    result=f"OpenAI API error: {e}",
                     completed=True,
                     usage=usage_obj,
                 )
@@ -479,10 +472,8 @@ class OpenAICUAClient(AgentClient):
                     "inference_time_ms": total_inference_time_ms,
                 }
                 return AgentResult(
-                    success=True,
                     actions=[act.action for act in actions_taken if act.action],
                     message=final_model_message or "Task completed.",
-                    result=final_model_message or "Task completed.",
                     completed=True,
                     usage=usage_obj,
                 )
@@ -498,10 +489,8 @@ class OpenAICUAClient(AgentClient):
                     "inference_time_ms": total_inference_time_ms,
                 }
                 return AgentResult(
-                    success=False,
                     actions=[act.action for act in actions_taken if act.action],
                     message="Model did not provide further actions.",
-                    result="Model did not provide further actions.",
                     completed=False,
                     usage=usage_obj,
                 )
@@ -513,10 +502,8 @@ class OpenAICUAClient(AgentClient):
             "inference_time_ms": total_inference_time_ms,
         }
         return AgentResult(
-            success=False,
             actions=[act.action for act in actions_taken if act.action],
             message="Max steps reached.",
-            result="Max steps reached.",
             completed=False,
             usage=usage_obj,
         )
