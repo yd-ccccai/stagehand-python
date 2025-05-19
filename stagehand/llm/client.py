@@ -127,6 +127,6 @@ class LLMClient:
             return response
 
         except Exception as e:
-            logger.error(f"Error calling litellm.completion: {e}", exc_info=True)
+            logger.error(f"Error calling litellm.completion: {e}")
             # Consider more specific exception handling based on litellm errors
             raise
