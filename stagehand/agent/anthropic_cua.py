@@ -86,8 +86,16 @@ class AnthropicCUAClient(AgentClient):
                     "required": ["url"],
                 },
             },
+            {
+                "name": "navigate_back",
+                "description": "Navigate back to the previous page",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
         ]
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.max_tokens = kwargs.get("max_tokens", 1024)
         self.last_tool_use_ids = None
         self.logger.info(
             f"AnthropicCUAClient initialized for model: {model}",
@@ -143,7 +151,8 @@ class AnthropicCUAClient(AgentClient):
                 response = self.anthropic_sdk_client.beta.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
-                    system=self.instructions,  # System prompt
+                    system=self.instructions
+                    + "Remember to call the computer tools, and only goto or navigate_back if you need to. Screenshots, clicks, etc, will be parsed from computer tool calls",  # System prompt
                     messages=current_messages,
                     tools=self.tools,
                     betas=["computer-use-2025-01-24"],
@@ -300,9 +309,6 @@ class AnthropicCUAClient(AgentClient):
         task_completed = not bool(
             agent_action
         )  # Task is complete if no tool_use blocks
-        self.logger.info(
-            f"{agent_action}, {model_message_text}, {task_completed}, {raw_assistant_content_blocks}"
-        )
 
         return (
             agent_action,
@@ -314,14 +320,18 @@ class AnthropicCUAClient(AgentClient):
     def _convert_tool_use_to_agent_action(
         self, tool_name: str, tool_input: dict[str, Any]
     ) -> Optional[AgentAction]:
-        if tool_name != "computer" and tool_name != "goto":
+        if (
+            tool_name != "computer"
+            and tool_name != "goto"
+            and tool_name != "navigate_back"
+        ):
             self.logger.warning(
                 f"Unsupported tool name from Anthropic: {tool_name}",
                 category=StagehandFunctionName.AGENT,
             )
             return None
 
-        if tool_name == "goto":
+        if tool_name == "goto" or tool_name == "navigate_back":
             action_type_str = "function"
         else:
             action_type_str = tool_input.get("action")
@@ -542,6 +552,13 @@ class AnthropicCUAClient(AgentClient):
                             category=StagehandFunctionName.AGENT,
                         )
                         return None
+                elif tool_name == "navigate_back":
+                    action_model_payload = AgentActionType(
+                        type="function",
+                        name="navigate_back",
+                        arguments=FunctionArguments(),
+                    )
+                    action_type_str = "function"
             else:
                 self.logger.warning(
                     f"Unsupported action type '{action_type_str}' from Anthropic computer tool.",
@@ -573,7 +590,6 @@ class AnthropicCUAClient(AgentClient):
         new_screenshot_base64: str,
         current_url: Optional[str],
     ) -> list[dict[str, Any]]:
-        self.logger.info(f"Action result: {action_result}")
         content_for_tool_result: list[dict[str, Any]] = []
         is_error_result = not action_result.get("success", False)
 

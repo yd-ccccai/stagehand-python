@@ -53,6 +53,9 @@ class CUAHandler:  # Computer Use Agent Handler
             }
 
         try:
+            # Store initial URL to detect navigation
+            initial_url = self.page.url
+
             if action_type == "click":
                 # specific_action_model is already an instance of ClickAction
                 x, y = specific_action_model.x, specific_action_model.y
@@ -66,7 +69,9 @@ class CUAHandler:  # Computer Use Agent Handler
                     await self._animate_click(x, y)
                     await asyncio.sleep(0.1)  # Ensure animation is visible
                     await self.page.mouse.click(x, y, button=button)
-                # Consider new tab/page handling logic here if needed
+
+                # Check for page navigation
+                await self.handle_page_navigation("click", initial_url)
                 return {"success": True}
 
             elif action_type == "double_click":
@@ -78,6 +83,9 @@ class CUAHandler:  # Computer Use Agent Handler
                 await self._animate_click(x, y)
                 await asyncio.sleep(0.1)
                 await self.page.mouse.dblclick(x, y)
+
+                # Check for page navigation
+                await self.handle_page_navigation("double_click", initial_url)
                 return {"success": True}
 
             elif action_type == "type":
@@ -92,6 +100,9 @@ class CUAHandler:  # Computer Use Agent Handler
                 for key_str in specific_action_model.keys:
                     playwright_key = self._convert_key_name(key_str)
                     await self.page.keyboard.press(playwright_key)  # Press each key
+
+                # Check for page navigation - keys like Enter can cause navigation
+                await self.handle_page_navigation("keypress", initial_url)
                 return {"success": True}
 
             elif action_type == "scroll":
@@ -109,6 +120,9 @@ class CUAHandler:  # Computer Use Agent Handler
                 args = getattr(specific_action_model, "arguments", {})
                 if name == "goto" and args.url:
                     await self.page.goto(args.url)
+                    return {"success": True}
+                elif name == "navigate_back":
+                    await self.page.go_back()
                     return {"success": True}
                 # Add other function calls like back, forward, reload if needed, similar to TS version
                 self.logger.warning(
@@ -131,6 +145,9 @@ class CUAHandler:  # Computer Use Agent Handler
                 else:
                     # Use _convert_key_name for consistency if possible, or press directly
                     await self.page.keyboard.press(self._convert_key_name(text))
+
+                # Check for page navigation - Enter and other keys may navigate
+                await self.handle_page_navigation("key", initial_url)
                 return {"success": True}
 
             elif action_type == "wait":
@@ -248,3 +265,68 @@ class CUAHandler:  # Computer Use Agent Handler
         # Convert to uppercase for case-insensitive matching then check map,
         # default to original key if not found.
         return key_map.get(key.upper(), key)
+
+    async def _handle_page_navigation(self) -> None:
+        """Handle page navigation actions."""
+        pass
+
+    async def handle_page_navigation(
+        self,
+        action_description: str,
+        initial_url: str,
+        dom_settle_timeout_ms: int = 1000,
+    ) -> None:
+        """Handle possible page navigation after an action."""
+        self.logger.debug(
+            f"{action_description} - checking for page navigation",
+            category=StagehandFunctionName.AGENT,
+        )
+
+        # Check for new tab/window
+        new_opened_tab = None
+        try:
+            async with self.page.context.expect_page(timeout=1500) as new_page_info:
+                # Just checking if a page was opened by the action
+                pass
+            new_opened_tab = await new_page_info.value
+        except Exception:
+            new_opened_tab = None
+
+        # Handle new tab if one was opened
+        if new_opened_tab:
+            self.logger.info(
+                f"New tab detected with URL: {new_opened_tab.url}",
+                category=StagehandFunctionName.AGENT,
+            )
+            new_tab_url = new_opened_tab.url
+            await new_opened_tab.close()
+            await self.page.goto(new_tab_url)
+            await self.page.wait_for_load_state("domcontentloaded")
+
+        # Wait for DOM to settle
+        try:
+            await self.page.wait_for_load_state(
+                "domcontentloaded", timeout=dom_settle_timeout_ms
+            )
+            # Additional optional wait for network idle
+            await self.page.wait_for_load_state(
+                "networkidle", timeout=dom_settle_timeout_ms
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"Wait for DOM settle timed out: {str(e)}",
+                category=StagehandFunctionName.AGENT,
+            )
+
+        # Check if URL changed
+        current_url = self.page.url
+        if current_url != initial_url:
+            self.logger.debug(
+                f"Page navigation detected: {initial_url} -> {current_url}",
+                category=StagehandFunctionName.AGENT,
+            )
+
+        self.logger.debug(
+            "Finished checking for page navigation",
+            category=StagehandFunctionName.AGENT,
+        )
