@@ -23,7 +23,7 @@ class ClickAction(BaseModel):
     type: Literal["click"]
     x: int
     y: int
-    button: Optional[Literal["left", "right", "middle"]]
+    button: Optional[Literal["left", "right", "middle", "back", "forward"]]
 
 
 class DoubleClickAction(BaseModel):

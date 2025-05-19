@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..handlers.cua_handler import CUAHandler
 from ..types.agent import (
@@ -51,13 +51,13 @@ class AnthropicCUAClient(AgentClient):
 
     def _format_initial_messages(
         self, instruction: str, screenshot_base64: Optional[str]
-    ) -> List[Any]:
+    ) -> list[Any]:
         self.logger.debug(
             "AnthropicCUAClient _format_initial_messages called (stub)",
             category="agent",
         )
         messages = []
-        user_content: List[Any] = [{"type": "text", "text": instruction}]
+        user_content: list[Any] = [{"type": "text", "text": instruction}]
         if screenshot_base64:
             user_content.append(
                 {
@@ -74,7 +74,7 @@ class AnthropicCUAClient(AgentClient):
 
     def _process_provider_response(
         self, response: Any
-    ) -> Tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
+    ) -> tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
         self.logger.debug(
             "AnthropicCUAClient _process_provider_response called (stub)",
             category="agent",
@@ -88,7 +88,7 @@ class AnthropicCUAClient(AgentClient):
 
     def _format_action_feedback(
         self, action_result: ActionExecutionResult, new_screenshot_base64: str
-    ) -> List[Any]:
+    ) -> list[Any]:
         self.logger.debug(
             "AnthropicCUAClient _format_action_feedback called (stub)", category="agent"
         )

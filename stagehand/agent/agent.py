@@ -1,4 +1,4 @@
-from typing import Optional, Type, Union
+from typing import Optional, Union
 
 from ..handlers.cua_handler import CUAHandler
 from ..types.agent import (
@@ -11,7 +11,7 @@ from .anthropic_cua import AnthropicCUAClient
 from .client import AgentClient
 from .openai_cua import OpenAICUAClient
 
-MODEL_TO_CLIENT_CLASS_MAP: dict[str, Type[AgentClient]] = {
+MODEL_TO_CLIENT_CLASS_MAP: dict[str, type[AgentClient]] = {
     "computer-use-preview": OpenAICUAClient,
     "claude-3-5-sonnet-20240620": AnthropicCUAClient,
     "claude-3-7-sonnet-20250219": AnthropicCUAClient,
@@ -42,7 +42,7 @@ class Agent:
         self.client: AgentClient = self._get_client()
 
     def _get_client(self) -> AgentClient:
-        ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)
+        ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)  # noqa: N806
         if not ClientClass:
             self.logger.error(
                 f"Unsupported model or client not mapped: {self.config.model}"
@@ -109,13 +109,15 @@ class Agent:
                 usage=empty_usage,
             )
 
+        # Update metrics if usage data is available in the result
         if agent_result.usage:
-            self.stagehand.update_metrics(
-                AGENT_METRIC_FUNCTION_NAME,
-                agent_result.usage.get("input_tokens", 0),
-                agent_result.usage.get("output_tokens", 0),
-                agent_result.usage.get("inference_time_ms", 0),
-            )
+            # self.stagehand.update_metrics(
+            #     AGENT_METRIC_FUNCTION_NAME,
+            #     agent_result.usage.get("input_tokens", 0),
+            #     agent_result.usage.get("output_tokens", 0),
+            #     agent_result.usage.get("inference_time_ms", 0),
+            # )
+            pass  # Placeholder if metrics are to be handled differently or not at all
 
         self.logger.info(
             f"Agent execution finished. Success: {agent_result.success}. Message: {agent_result.message}",

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 # Forward declaration or direct import. Assuming direct import is fine.
 # If circular dependency issues arise, a forward declaration string might be needed for CUAHandler type hint.
@@ -52,7 +52,7 @@ class AgentClient(ABC):
     @abstractmethod
     def _process_provider_response(
         self, response: Any
-    ) -> Tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
+    ) -> tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
         """
         Parses the raw response from the CUA provider.
         Returns:
