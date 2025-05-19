@@ -96,9 +96,6 @@ class OpenAICUAClient(AgentClient):
     def _process_provider_response(
         self, response: Any
     ) -> tuple[Optional[AgentAction], Optional[str], bool, Optional[str]]:
-        self.logger.info(
-            "OpenAI CUA: Processing response.", category="agent"
-        )  # Removed full response log for brevity
         if not response.output:
             self.logger.error(
                 "No output from OpenAI model in response object", category="agent"
@@ -198,10 +195,6 @@ class OpenAICUAClient(AgentClient):
                 )
 
         elif function_call_item:
-            self.logger.info(
-                f"Received function_call: {function_call_item.name} with id {function_call_item.id}",
-                category="agent",
-            )
             self.last_openai_tool_calls = [
                 {
                     "type": "function_call",
@@ -309,19 +302,16 @@ class OpenAICUAClient(AgentClient):
         if action_result["success"]:
             if is_computer_call:
                 output_payload = self.format_screenshot(new_screenshot_base64)
-            else:  # Function call success
+            else:
                 # Function results are often simple strings or JSON strings.
-                # If action_result has specific data for function, use it. Example:
                 output_payload = json.dumps(
                     {
                         "status": "success",
                         "detail": f"Function {action_type_performed} executed.",
                     }
                 )
-                # Or, if action_result contains a specific "return_value" from the function:
-                # output_payload = json.dumps(action_result.get("return_value", {"status": "success"}))
 
-        else:  # Action failed
+        else:
             error_message = f"Action {action_type_performed} failed: {action_result.get('error', 'Unknown error')}"
             self.logger.info(
                 f"Formatting failed action feedback for OpenAI: {error_message}",
@@ -331,9 +321,8 @@ class OpenAICUAClient(AgentClient):
                 output_payload = {
                     "type": "input_text",
                     "text": error_message,
-                }  # As decided before
-            else:  # Function call failed
-                # Function call errors might also be JSON strings.
+                }
+            else:
                 output_payload = json.dumps(
                     {"status": "error", "detail": error_message}
                 )
@@ -352,7 +341,10 @@ class OpenAICUAClient(AgentClient):
         max_steps: int = 20,
         options: Optional[AgentExecuteOptions] = None,
     ) -> AgentResult:
-        self.logger.info(f"OpenAI CUA starting task: '{instruction}'", category="agent")
+        self.logger.debug(
+            f"OpenAI CUA starting task: '{instruction}' with max_steps: {max_steps}",
+            category="agent",
+        )
 
         if not self.handler:
             self.logger.error(
@@ -381,7 +373,6 @@ class OpenAICUAClient(AgentClient):
             self.logger.info(
                 f"OpenAI CUA - Step {step_count + 1}/{max_steps}",
                 category="agent",
-                auxiliary={"current_input_items_count": len(current_input_items)},
             )
 
             start_time = asyncio.get_event_loop().time()
@@ -424,15 +415,6 @@ class OpenAICUAClient(AgentClient):
                 self.logger.info(f"Model reasoning: {reasoning_text}", category="agent")
 
             if agent_action:
-                self.logger.info(
-                    f"Executing action: {agent_action.action_type} {agent_action.action.root.name if agent_action.action_type == 'function' else ''}",
-                    category="agent",
-                    auxiliary=(
-                        agent_action.action.model_dump()
-                        if agent_action.action
-                        else None
-                    ),
-                )
                 actions_taken.append(agent_action)
 
                 action_result: ActionExecutionResult = (

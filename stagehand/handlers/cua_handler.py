@@ -35,12 +35,7 @@ class CUAHandler:  # Computer Use Agent Handler
     async def perform_action(self, action: AgentAction) -> ActionExecutionResult:
         """Execute a single action on the page."""
         self.logger.info(
-            f"Performing action: {action.action_type}",
-            auxiliary={
-                "action_details": (
-                    action.action.model_dump_json() if action.action else None
-                )
-            },
+            f"Performing action: {action.action.root if action.action else ''}",
             category=StagehandFunctionName.AGENT,
         )
         action_type = action.action_type
@@ -112,10 +107,6 @@ class CUAHandler:  # Computer Use Agent Handler
                 # specific_action_model is FunctionAction
                 name = specific_action_model.name
                 args = getattr(specific_action_model, "arguments", {})
-                self.logger.info(
-                    f"Function call: {name} with args: {args}",
-                    category=StagehandFunctionName.AGENT,
-                )
                 if name == "goto" and args.url:
                     await self.page.goto(args.url)
                     return {"success": True}
@@ -180,13 +171,13 @@ class CUAHandler:  # Computer Use Agent Handler
 
     async def inject_cursor(self) -> None:
         """Inject a cursor element into the page for visual feedback by calling the JS function."""
-        self.logger.info(
+        self.logger.debug(
             "Attempting to inject cursor via window.__stagehandInjectCursor",
             category=StagehandFunctionName.AGENT,
         )
         try:
             await self.page.evaluate("window.__stagehandInjectCursor()")
-            self.logger.info(
+            self.logger.debug(
                 "Cursor injection via JS function initiated.",
                 category=StagehandFunctionName.AGENT,
             )
