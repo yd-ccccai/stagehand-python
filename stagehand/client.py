@@ -108,7 +108,11 @@ class Stagehand(StagehandBase):
         )
 
         self.env = env.upper() if env else "BROWSERBASE"
-        self.local_browser_launch_options = local_browser_launch_options or {}
+        self.local_browser_launch_options = (
+            getattr(config, "local_browser_launch_options", {})
+            if config
+            else local_browser_launch_options
+        )
         self._local_user_data_dir_temp: Optional[Path] = (
             None  # To store path if created temporarily
         )
@@ -374,11 +378,11 @@ class Stagehand(StagehandBase):
                         "args",
                         [
                             # Common args from TS version
-                            "--enable-webgl",
-                            "--use-gl=swiftshader",
-                            "--enable-accelerated-2d-canvas",
+                            # "--enable-webgl",
+                            # "--use-gl=swiftshader",
+                            # "--enable-accelerated-2d-canvas",
                             "--disable-blink-features=AutomationControlled",
-                            "--disable-web-security",  # Use with caution
+                            # "--disable-web-security",  # Use with caution
                         ],
                     ),
                     # Add more translations as needed based on local_browser_launch_options structure
