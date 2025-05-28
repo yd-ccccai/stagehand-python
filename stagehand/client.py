@@ -261,19 +261,29 @@ class Stagehand(StagehandBase):
         if not self.model_api_key:
             raise ValueError("model_api_key is required to create a session.")
 
+        browserbase_session_create_params = (
+            convert_dict_keys_to_camel_case(self.browserbase_session_create_params)
+            if self.browserbase_session_create_params
+            else None
+        )
+
         payload = {
             "modelName": self.model_name,
+            "verbose": 2 if self.verbose == 3 else self.verbose,
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
-            "verbose": self.verbose,
-            "browserbaseSessionCreateParams": {
-                "browserSettings": {
-                    "blockAds": True,
-                    "viewport": {
-                        "width": 1024,
-                        "height": 768,
+            "browserbaseSessionCreateParams": (
+                browserbase_session_create_params
+                if browserbase_session_create_params
+                else {
+                    "browserSettings": {
+                        "blockAds": True,
+                        "viewport": {
+                            "width": 1024,
+                            "height": 768,
+                        },
                     },
-                },
-            },
+                }
+            ),
         }
 
         # Add the new parameters if they have values
