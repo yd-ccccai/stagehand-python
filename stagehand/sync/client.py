@@ -31,13 +31,11 @@ class Stagehand(StagehandBase):
         config: Optional[StagehandConfig] = None,
         server_url: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[dict[str, Any]], Any]] = default_log_handler,
-        verbose: int = 1,
-        model_name: Optional[str] = None,
-        dom_settle_timeout_ms: Optional[int] = None,
+        on_log: Optional[
+            Callable[[dict[str, Any]], Any]
+        ] = default_log_handler,
         timeout_settings: Optional[float] = None,
         model_client_options: Optional[dict[str, Any]] = None,
-        stream_response: Optional[bool] = None,
         use_rich_logging: bool = True,
         **kwargs: Any,
     ):
@@ -45,12 +43,8 @@ class Stagehand(StagehandBase):
             config=config,
             server_url=server_url,
             model_api_key=model_api_key,
-            on_log=None,
-            verbose=verbose,
-            model_name=model_name,
-            dom_settle_timeout_ms=dom_settle_timeout_ms,
+            on_log=on_log,
             timeout_settings=timeout_settings,
-            stream_response=stream_response,
             model_client_options=model_client_options,
             **kwargs,
         )
@@ -213,20 +207,31 @@ class Stagehand(StagehandBase):
             raise ValueError("browserbase_project_id is required to create a session.")
         if not self.model_api_key:
             raise ValueError("model_api_key is required to create a session.")
+        
+        browserbase_session_create_params = (
+            convert_dict_keys_to_camel_case(self.browserbase_session_create_params)
+            if self.browserbase_session_create_params
+            else None
+        )
+        self.logger.info(f"Model name: {self.model_name}")
 
         payload = {
             "modelName": self.model_name,
+            "verbose": 2 if self.verbose == 3 else self.verbose,
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
-            "verbose": self.verbose,
-            "browserbaseSessionCreateParams": {
-                "browserSettings": {
-                    "blockAds": True,
-                    "viewport": {
-                        "width": 1024,
-                        "height": 768,
+            "browserbaseSessionCreateParams": (
+                browserbase_session_create_params
+                if browserbase_session_create_params
+                else {
+                    "browserSettings": {
+                        "blockAds": True,
+                        "viewport": {
+                            "width": 1024,
+                            "height": 768,
+                        },
                     },
-                },
-            },
+                }
+            ),
         }
 
         # Add the new parameters if they have values
