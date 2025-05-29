@@ -10,7 +10,8 @@ DEFAULT_EXTRACT_SCHEMA = {
     "required": ["extraction"],
 }
 
-# TODO: Remove this 
+
+# TODO: Remove this
 class AvailableModel(str, Enum):
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
