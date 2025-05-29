@@ -674,3 +674,17 @@ def convert_dict_keys_to_camel_case(data: dict[str, Any]) -> dict[str, Any]:
         result[camel_key] = value
 
     return result
+
+
+# Convert any non-serializable objects to plain Python objects
+def make_serializable(obj):
+    """Recursively convert non-JSON-serializable objects to serializable ones."""
+    if hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
+        # Handle iterables (including ValidatorIterator)
+        if hasattr(obj, "__next__"):  # It's an iterator
+            return [make_serializable(item) for item in obj]
+        elif isinstance(obj, (list, tuple)):
+            return [make_serializable(item) for item in obj]
+        elif isinstance(obj, dict):
+            return {key: make_serializable(value) for key, value in obj.items()}
+    return obj

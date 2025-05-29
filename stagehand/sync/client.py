@@ -31,9 +31,7 @@ class Stagehand(StagehandBase):
         config: Optional[StagehandConfig] = None,
         server_url: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[
-            Callable[[dict[str, Any]], Any]
-        ] = default_log_handler,
+        on_log: Optional[Callable[[dict[str, Any]], Any]] = default_log_handler,
         timeout_settings: Optional[float] = None,
         model_client_options: Optional[dict[str, Any]] = None,
         use_rich_logging: bool = True,
@@ -207,7 +205,7 @@ class Stagehand(StagehandBase):
             raise ValueError("browserbase_project_id is required to create a session.")
         if not self.model_api_key:
             raise ValueError("model_api_key is required to create a session.")
-        
+
         browserbase_session_create_params = (
             convert_dict_keys_to_camel_case(self.browserbase_session_create_params)
             if self.browserbase_session_create_params
