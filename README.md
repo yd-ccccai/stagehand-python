@@ -11,6 +11,7 @@
 
 <p align="center">
   <strong>The AI Browser Automation Framework</strong><br>
+    <a href="https://docs.stagehand.dev">Read the Docs</a>
 </p>
 
 <p align="center">
