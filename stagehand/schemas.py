@@ -10,7 +10,7 @@ DEFAULT_EXTRACT_SCHEMA = {
     "required": ["extraction"],
 }
 
-
+# TODO: Remove this 
 class AvailableModel(str, Enum):
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
@@ -39,7 +39,7 @@ class ActOptions(StagehandBaseModel):
     Attributes:
         action (str): The action command to be executed by the AI.
         variables (Optional[dict[str, str]]): Key-value pairs for variable substitution.
-        model_name (Optional[AvailableModel]): The model to use for processing.
+        model_name (Optional[str]): The model to use for processing.
         slow_dom_based_act (Optional[bool]): Whether to use DOM-based action execution.
         dom_settle_timeout_ms (Optional[int]): Additional time for DOM to settle after an action.
         timeout_ms (Optional[int]): Timeout for the action in milliseconds.
@@ -47,7 +47,7 @@ class ActOptions(StagehandBaseModel):
 
     action: str = Field(..., description="The action command to be executed by the AI.")
     variables: Optional[dict[str, str]] = None
-    model_name: Optional[AvailableModel] = None
+    model_name: Optional[str] = None
     slow_dom_based_act: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
     timeout_ms: Optional[int] = None
@@ -75,7 +75,7 @@ class ExtractOptions(StagehandBaseModel):
 
     Attributes:
         instruction (str): Instruction specifying what data to extract using AI.
-        model_name (Optional[AvailableModel]): The model to use for processing.
+        model_name (Optional[str]): The model to use for processing.
         selector (Optional[str]): CSS selector to limit extraction to.
         schema_definition (Union[dict[str, Any], type[BaseModel]]): A JSON schema or Pydantic model that defines the structure of the expected data.
             Note: If passing a Pydantic model, invoke its .model_json_schema() method to ensure the schema is JSON serializable.
@@ -86,7 +86,7 @@ class ExtractOptions(StagehandBaseModel):
     instruction: str = Field(
         ..., description="Instruction specifying what data to extract using AI."
     )
-    model_name: Optional[AvailableModel] = None
+    model_name: Optional[str] = None
     selector: Optional[str] = None
     # IMPORTANT: If using a Pydantic model for schema_definition, please call its .model_json_schema() method
     # to convert it to a JSON serializable dictionary before sending it with the extract command.
@@ -182,7 +182,7 @@ class ObserveOptions(StagehandBaseModel):
 
     Attributes:
         instruction (str): Instruction detailing what the AI should observe.
-        model_name (Optional[AvailableModel]): The model to use for processing.
+        model_name (Optional[str]): The model to use for processing.
         only_visible (Optional[bool]): Whether to only consider visible elements.
         return_action (Optional[bool]): Whether to include action information in the result.
         draw_overlay (Optional[bool]): Whether to draw an overlay on observed elements.
@@ -193,7 +193,7 @@ class ObserveOptions(StagehandBaseModel):
         ..., description="Instruction detailing what the AI should observe."
     )
     only_visible: Optional[bool] = False
-    model_name: Optional[AvailableModel] = None
+    model_name: Optional[str] = None
     return_action: Optional[bool] = None
     draw_overlay: Optional[bool] = None
     dom_settle_timeout_ms: Optional[int] = None
