@@ -62,7 +62,7 @@ class Stagehand:
         system_prompt: Optional[str] = None,
         use_rich_logging: bool = True,
         env: Literal["BROWSERBASE", "LOCAL"] = None,
-        local_browser_launch_options: Optional[dict[str, Any]] = dict(),
+        local_browser_launch_options: Optional[dict[str, Any]] = None,
         browserbase_session_create_params: Optional[BrowserbaseSessionCreateParams] = None,
     ):
         """
@@ -165,7 +165,7 @@ class Stagehand:
         self.local_browser_launch_options = (
             getattr(config, "local_browser_launch_options", {})
             if config
-            else local_browser_launch_options
+            else local_browser_launch_options if local_browser_launch_options else {}
         )
         self._local_user_data_dir_temp: Optional[Path] = (
             None  # To store path if created temporarily
