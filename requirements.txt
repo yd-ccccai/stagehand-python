@@ -1,8 +1,2 @@
-httpx>=0.24.0
-asyncio>=3.4.3 
-python-dotenv>=1.0.0
-pydantic>=1.10.0
-playwright>=1.42.1
-requests>=2.31.0
-rich
-browserbase
+# Installs the package in editable mode with development dependencies
+-e .[dev]
