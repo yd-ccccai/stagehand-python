@@ -77,7 +77,7 @@ class StagehandConfig(BaseModel):
         description="System prompt to use for LLM interactions",
     )
     local_browser_launch_options: Optional[dict[str, Any]] = Field(
-        None,
+        {},
         alias="localBrowserLaunchOptions",
         description="Local browser launch options",
     )

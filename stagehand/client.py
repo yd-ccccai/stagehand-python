@@ -10,6 +10,7 @@ from typing import Any, Callable, Literal, Optional
 
 import httpx
 from browserbase import Browserbase
+from browserbase.types import SessionCreateParams as BrowserbaseSessionCreateParams
 from dotenv import load_dotenv
 from playwright.async_api import (
     BrowserContext,
@@ -18,18 +19,17 @@ from playwright.async_api import (
 )
 from playwright.async_api import Page as PlaywrightPage
 
-from .base import StagehandBase
 from .config import StagehandConfig
 from .context import StagehandContext
 from .llm import LLMClient
 from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
-from .utils import StagehandLogger, convert_dict_keys_to_camel_case
+from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
 
 
-class Stagehand(StagehandBase):
+class Stagehand:
     """
     Python client for interacting with a running Stagehand server and Browserbase remote headless browser.
 
@@ -42,6 +42,7 @@ class Stagehand(StagehandBase):
 
     def __init__(
         self,
+        *,
         config: Optional[StagehandConfig] = None,
         server_url: Optional[str] = None,
         session_id: Optional[str] = None,
@@ -61,7 +62,8 @@ class Stagehand(StagehandBase):
         system_prompt: Optional[str] = None,
         use_rich_logging: bool = True,
         env: Literal["BROWSERBASE", "LOCAL"] = None,
-        local_browser_launch_options: Optional[dict[str, Any]] = None,
+        local_browser_launch_options: Optional[dict[str, Any]] = dict(),
+        browserbase_session_create_params: Optional[BrowserbaseSessionCreateParams] = None,
     ):
         """
         Initialize the Stagehand client.
@@ -89,24 +91,74 @@ class Stagehand(StagehandBase):
             local_browser_launch_options (Optional[dict[str, Any]]): Options for launching the local browser context
                 when env="LOCAL". See Playwright's launch_persistent_context documentation.
                 Common keys: 'headless', 'user_data_dir', 'downloads_path', 'viewport', 'locale', 'proxy', 'args', 'cdp_url'.
+            browserbase_session_create_params (Optional[BrowserbaseSessionCreateParams]): Params for Browserbase session creation.
         """
-        super().__init__(
-            config=config,
-            server_url=server_url,
-            session_id=session_id,
-            browserbase_api_key=browserbase_api_key,
-            browserbase_project_id=browserbase_project_id,
-            model_api_key=model_api_key,
-            on_log=on_log,
-            verbose=verbose,
-            model_name=model_name,
-            dom_settle_timeout_ms=dom_settle_timeout_ms,
-            timeout_settings=timeout_settings,
-            stream_response=stream_response,
-            model_client_options=model_client_options,
-            self_heal=self_heal,
-            wait_for_captcha_solves=wait_for_captcha_solves,
-            system_prompt=system_prompt,
+        # Initialize configuration from config object or individual parameters
+        self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
+
+        if config:
+            self.browserbase_api_key = (
+                config.api_key
+                or browserbase_api_key
+                or os.getenv("BROWSERBASE_API_KEY")
+            )
+            self.browserbase_project_id = (
+                config.project_id
+                or browserbase_project_id
+                or os.getenv("BROWSERBASE_PROJECT_ID")
+            )
+            self.session_id = config.browserbase_session_id or session_id
+            self.model_name = config.model_name or model_name
+            self.dom_settle_timeout_ms = (
+                config.dom_settle_timeout_ms or dom_settle_timeout_ms
+            )
+            self.self_heal = (
+                config.self_heal if config.self_heal is not None else self_heal
+            )
+            self.wait_for_captcha_solves = (
+                config.wait_for_captcha_solves
+                if config.wait_for_captcha_solves is not None
+                else wait_for_captcha_solves
+            )
+            self.system_prompt = config.system_prompt or system_prompt
+            self.browserbase_session_create_params = (
+                config.browserbase_session_create_params
+                or browserbase_session_create_params
+            )
+            self.verbose = config.verbose if config.verbose is not None else verbose
+        else:
+            self.browserbase_api_key = browserbase_api_key or os.getenv(
+                "BROWSERBASE_API_KEY"
+            )
+            self.browserbase_project_id = browserbase_project_id or os.getenv(
+                "BROWSERBASE_PROJECT_ID"
+            )
+            self.session_id = session_id
+            self.model_name = model_name
+            self.dom_settle_timeout_ms = dom_settle_timeout_ms
+            self.self_heal = self_heal
+            self.wait_for_captcha_solves = wait_for_captcha_solves
+            self.system_prompt = system_prompt
+            self.browserbase_session_create_params = browserbase_session_create_params
+            self.verbose = verbose
+
+        # Handle model-related settings directly
+        self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
+        self.model_client_options = model_client_options or {}
+        if self.model_api_key and "apiKey" not in self.model_client_options:
+            self.model_client_options["apiKey"] = self.model_api_key
+
+        # Handle streaming response setting directly
+        self.streamed_response = (
+            stream_response if stream_response is not None else True
+        )
+
+        self.on_log = on_log or default_log_handler
+        self.timeout_settings = timeout_settings or httpx.Timeout(
+            connect=180.0,
+            read=180.0,
+            write=180.0,
+            pool=180.0,
         )
 
         self.env = env.upper() if env else "BROWSERBASE"
@@ -126,6 +178,11 @@ class Stagehand(StagehandBase):
         # Validate env
         if self.env not in ["BROWSERBASE", "LOCAL"]:
             raise ValueError("env must be either 'BROWSERBASE' or 'LOCAL'")
+
+        # Initialize the centralized logger with the specified verbosity
+        self.logger = StagehandLogger(
+            verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
+        )
 
         # If using BROWSERBASE, session_id or creation params are needed
         if self.env == "BROWSERBASE":
@@ -155,18 +212,7 @@ class Stagehand(StagehandBase):
                         "browserbase_project_id is required for BROWSERBASE env with existing session_id (or set BROWSERBASE_PROJECT_ID in env)."
                     )
 
-        # Initialize the centralized logger with the specified verbosity
-        self.logger = StagehandLogger(
-            verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
-        )
-
         self.httpx_client = httpx_client
-        self.timeout_settings = timeout_settings or httpx.Timeout(
-            connect=180.0,
-            read=180.0,
-            write=180.0,
-            pool=180.0,
-        )
         self._client: Optional[httpx.AsyncClient] = (
             None  # Used for server communication in BROWSERBASE
         )

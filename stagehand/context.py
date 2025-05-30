@@ -87,12 +87,14 @@ class StagehandContext:
 
             return wrapped_new_page
         elif name == "pages":
-            # Wrap the pages method to return StagehandPage objects
-            def wrapped_pages(*args, **kwargs):
-                pw_pages = self._context.pages(*args, **kwargs)
-                # This is synchronous, so we can't await here
-                # We'll return the unwrapped pages and let the caller handle wrapping if needed
-                return pw_pages
+            async def wrapped_pages():
+                pw_pages = self._context.pages
+                # Return StagehandPage objects
+                result = []
+                for pw_page in pw_pages:
+                    stagehand_page = await self.get_stagehand_page(pw_page)
+                    result.append(stagehand_page)
+                return result
 
             return wrapped_pages
         return attr

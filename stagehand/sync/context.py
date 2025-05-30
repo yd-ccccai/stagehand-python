@@ -87,11 +87,15 @@ class SyncStagehandContext:
 
             return wrapped_new_page
         elif name == "pages":
-            # Wrap the pages method to return StagehandPage objects
-            def wrapped_pages(*args, **kwargs):
-                pw_pages = self._context.pages(*args, **kwargs)
-                # We'll return the unwrapped pages and let the caller handle wrapping if needed
-                return pw_pages
+            # Handle pages as a property, not a method
+            def wrapped_pages():
+                pw_pages = self._context.pages  # This is a property, not a method
+                # Return SyncStagehandPage objects
+                result = []
+                for pw_page in pw_pages:
+                    stagehand_page = self.get_stagehand_page(pw_page)
+                    result.append(stagehand_page)
+                return result
 
             return wrapped_pages
         return attr
