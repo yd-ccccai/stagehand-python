@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class StagehandBase(ABC):
     """
     Base class for Stagehand client implementations.
-    Defines the common interface and functionality for both sync and async versions.
+    Defines the common interface and functionality.
     """
 
     def __init__(
