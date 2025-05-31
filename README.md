@@ -15,10 +15,10 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/stagehand-py">
+  <a href="https://pypi.org/project/stagehand">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/pypi/v/stagehand-py.svg?style=for-the-badge" />
-      <img alt="PyPI version" src="https://img.shields.io/pypi/v/stagehand-py.svg?style=for-the-badge" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/pypi/v/stagehand.svg?style=for-the-badge" />
+      <img alt="PyPI version" src="https://img.shields.io/pypi/v/stagehand.svg?style=for-the-badge" />
     </picture>
   </a>
   <a href="https://github.com/browserbase/stagehand/tree/main?tab=MIT-1-ov-file#MIT-1-ov-file">
@@ -65,7 +65,7 @@ await stagehand.agent.execute("book a reservation for 2 people for a trip to the
 Install the Python package via pip:
 
 ```bash
-pip install stagehand-py
+pip install stagehand
 ```
 ## Requirements
 
@@ -135,7 +135,7 @@ def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     stagehand.init()
     print(f"Session created: {stagehand.session_id}")
 
@@ -185,7 +185,7 @@ async def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     await stagehand.init()
     print(f"Session created: {stagehand.session_id}")
     
@@ -239,7 +239,7 @@ def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     stagehand.init()
     print(f"Session created: {stagehand.session_id}")
     
@@ -449,6 +449,7 @@ config = StagehandConfig(
     verbose=3  # Set verbosity level: 1=minimal, 2=medium, 3=detailed logs
 )
 ```
+
 
 ## License
 

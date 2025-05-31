@@ -26,6 +26,7 @@ class StagehandConfig(BaseModel):
         act_timeout_ms (Optional[int]): Timeout for act commands (in milliseconds).
         system_prompt (Optional[str]): System prompt to use for LLM interactions.
         verbose (Optional[int]): Verbosity level for logs (1=minimal, 2=medium, 3=detailed).
+        local_browser_launch_options (Optional[dict[str, Any]]): Local browser launch options.
     """
 
     env: str = "BROWSERBASE"
@@ -76,5 +77,28 @@ class StagehandConfig(BaseModel):
         alias="systemPrompt",
         description="System prompt to use for LLM interactions",
     )
+    local_browser_launch_options: Optional[dict[str, Any]] = Field(
+        {},
+        alias="localBrowserLaunchOptions",
+        description="Local browser launch options",
+    )
 
     model_config = ConfigDict(populate_by_name=True)
+
+    def with_overrides(self, **overrides) -> "StagehandConfig":
+        """
+        Create a new config instance with the specified overrides.
+        
+        Args:
+            **overrides: Key-value pairs to override in the config
+            
+        Returns:
+            StagehandConfig: New config instance with overrides applied
+        """
+        config_dict = self.model_dump()
+        config_dict.update(overrides)
+        return StagehandConfig(**config_dict)
+
+
+# Default configuration instance
+default_config = StagehandConfig()

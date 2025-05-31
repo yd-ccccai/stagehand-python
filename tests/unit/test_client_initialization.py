@@ -13,7 +13,7 @@ class TestClientInitialization:
     def test_init_with_direct_params(self):
         """Test initialization with direct parameters."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -21,7 +21,7 @@ class TestClientInitialization:
             verbose=2,
         )
 
-        assert client.server_url == "http://test-server.com"
+        assert client.api_url == "http://test-server.com"
         assert client.session_id == "test-session"
         assert client.browserbase_api_key == "test-api-key"
         assert client.browserbase_project_id == "test-project-id"
@@ -47,9 +47,9 @@ class TestClientInitialization:
             system_prompt="Custom system prompt for testing",
         )
 
-        client = Stagehand(config=config, server_url="http://test-server.com")
+        client = Stagehand(config=config, api_url="http://test-server.com")
 
-        assert client.server_url == "http://test-server.com"
+        assert client.api_url == "http://test-server.com"
         assert client.session_id == "config-session-id"
         assert client.browserbase_api_key == "config-api-key"
         assert client.browserbase_project_id == "config-project-id"
@@ -110,7 +110,7 @@ class TestClientInitialization:
     def test_init_as_context_manager(self):
         """Test the client as a context manager."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -137,7 +137,7 @@ class TestClientInitialization:
     async def test_create_session(self):
         """Test session creation."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",
@@ -161,7 +161,7 @@ class TestClientInitialization:
     async def test_create_session_failure(self):
         """Test session creation failure."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",
@@ -183,7 +183,7 @@ class TestClientInitialization:
     async def test_create_session_invalid_response(self):
         """Test session creation with invalid response format."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",

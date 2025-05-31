@@ -74,4 +74,27 @@ class StagehandContext:
 
     def __getattr__(self, name):
         # Forward attribute lookups to the underlying BrowserContext
-        return getattr(self._context, name)
+        attr = getattr(self._context, name)
+
+        # Special handling for methods that return pages
+        if name == "new_page":
+            # Replace with our own implementation that wraps the page
+            async def wrapped_new_page(*args, **kwargs):
+                pw_page = await self._context.new_page(*args, **kwargs)
+                stagehand_page = await self.create_stagehand_page(pw_page)
+                self.set_active_page(stagehand_page)
+                return stagehand_page
+
+            return wrapped_new_page
+        elif name == "pages":
+            async def wrapped_pages():
+                pw_pages = self._context.pages
+                # Return StagehandPage objects
+                result = []
+                for pw_page in pw_pages:
+                    stagehand_page = await self.get_stagehand_page(pw_page)
+                    result.append(stagehand_page)
+                return result
+
+            return wrapped_pages
+        return attr

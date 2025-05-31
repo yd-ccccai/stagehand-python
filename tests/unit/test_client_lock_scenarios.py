@@ -15,7 +15,7 @@ class TestClientLockScenarios:
     async def mock_stagehand_with_page(self):
         """Create a Stagehand with mocked page for testing."""
         stagehand = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="test-scenario-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -170,14 +170,14 @@ class TestClientLockScenarios:
         """Test that operations on different sessions can happen in parallel."""
         # Create two Stagehand instances with different session IDs
         stagehand1 = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="test-parallel-session-1",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
         )
 
         stagehand2 = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="test-parallel-session-2",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",

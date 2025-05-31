@@ -13,7 +13,7 @@ class TestClientConcurrentRequests:
     async def real_stagehand(self):
         """Create a Stagehand instance with a mocked _execute method that simulates delays."""
         stagehand = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="test-concurrent-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
