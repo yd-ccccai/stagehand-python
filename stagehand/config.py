@@ -88,10 +88,10 @@ class StagehandConfig(BaseModel):
     def with_overrides(self, **overrides) -> "StagehandConfig":
         """
         Create a new config instance with the specified overrides.
-        
+
         Args:
             **overrides: Key-value pairs to override in the config
-            
+
         Returns:
             StagehandConfig: New config instance with overrides applied
         """
