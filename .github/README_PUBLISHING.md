@@ -53,21 +53,7 @@ This project uses Ruff for linting and formatting. The workflow enforces these s
 
 To run the same checks locally:
 ```bash
-# Install Ruff
-pip install ruff
-
-# Run linting
-ruff check .
-
-# Check formatting
-ruff format --check .
-
-# Auto-fix issues where possible
-ruff check --fix .
-ruff format .
-
-# Use Black to format the code
-black .
+./format.sh
 ```
 
 ## Troubleshooting
