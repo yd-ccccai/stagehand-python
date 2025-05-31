@@ -94,6 +94,10 @@ class LLMClient:
                 "No model specified for chat completion (neither default_model nor model argument)."
             )
 
+        # Standardize gemini provider to google
+        if completion_model.startswith("google/"):
+            completion_model = completion_model.replace("google/", "gemini/")
+
         # Prepare arguments directly from kwargs
         params = {
             "model": completion_model,
