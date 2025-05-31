@@ -19,7 +19,7 @@ from .schemas import (
 )
 from .utils import configure_logging
 
-__version__ = "0.3.9"   #for pypi "stagehand"
+__version__ = "0.0.1"
 
 __all__ = [
     "Stagehand",
