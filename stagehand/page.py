@@ -243,9 +243,7 @@ class StagehandPage:
         # Otherwise, it should be an ExtractOptions object
         else:
             # Allow extraction without instruction if other options (like schema) are provided
-            options = ExtractOptions(**kwargs)  # schema_definition might be in kwargs
-
-        payload = options.model_dump(exclude_none=True, by_alias=True)
+            payload = options.model_dump(exclude_none=True, by_alias=True)
 
         # If in LOCAL mode, use local implementation
         if self._stagehand.env == "LOCAL":

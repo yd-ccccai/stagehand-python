@@ -19,6 +19,7 @@ from playwright.async_api import (
 )
 from playwright.async_api import Page as PlaywrightPage
 
+from .agent import Agent
 from .config import StagehandConfig
 from .context import StagehandContext
 from .llm import LLMClient
@@ -59,6 +60,12 @@ class Stagehand:
         env: Literal["BROWSERBASE", "LOCAL"] = None,
         local_browser_launch_options: Optional[dict[str, Any]] = None,
         browserbase_session_create_params: Optional[BrowserbaseSessionCreateParams] = None,
+        browserbase_api_key: Optional[str] = None,
+        browserbase_project_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        self_heal: bool = True,
+        wait_for_captcha_solves: bool = True,
+        system_prompt: Optional[str] = None,
     ):
         """
         Initialize the Stagehand client.
@@ -78,6 +85,12 @@ class Stagehand:
                 when env="LOCAL". See Playwright's launch_persistent_context documentation.
                 Common keys: 'headless', 'user_data_dir', 'downloads_path', 'viewport', 'locale', 'proxy', 'args', 'cdp_url'.
             browserbase_session_create_params (Optional[BrowserbaseSessionCreateParams]): Params for Browserbase session creation.
+            browserbase_api_key (Optional[str]): Browserbase API key for authentication.
+            browserbase_project_id (Optional[str]): Browserbase project ID.
+            session_id (Optional[str]): Existing Browserbase session ID to connect to.
+            self_heal (bool): Whether to enable self-healing capabilities.
+            wait_for_captcha_solves (bool): Whether to wait for CAPTCHA solutions.
+            system_prompt (Optional[str]): Custom system prompt for the AI model.
         """
         # Initialize configuration from config object or individual parameters
         self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
