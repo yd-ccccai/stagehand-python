@@ -680,7 +680,6 @@ def convert_dict_keys_to_camel_case(data: dict[str, Any]) -> dict[str, Any]:
 
     return result
 
-
 def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
     """Formats a node and its children into a simplified string representation."""
     indent = "  " * level
@@ -1135,3 +1134,15 @@ def inject_url_at_path(obj, segments, id_to_url_mapping):
         else:
             # Continue traversing the path
             inject_url_at_path(obj[key], rest, id_to_url_mapping)
+# Convert any non-serializable objects to plain Python objects
+def make_serializable(obj):
+    """Recursively convert non-JSON-serializable objects to serializable ones."""
+    if hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
+        # Handle iterables (including ValidatorIterator)
+        if hasattr(obj, "__next__"):  # It's an iterator
+            return [make_serializable(item) for item in obj]
+        elif isinstance(obj, (list, tuple)):
+            return [make_serializable(item) for item in obj]
+        elif isinstance(obj, dict):
+            return {key: make_serializable(value) for key, value in obj.items()}
+    return obj

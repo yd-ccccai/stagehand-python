@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 
@@ -7,7 +6,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
-from stagehand import Stagehand, StagehandConfig, AgentConfig, configure_logging
+from stagehand.sync import Stagehand
+from stagehand import StagehandConfig, AgentConfig, configure_logging
 from stagehand.schemas import AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
@@ -45,7 +45,7 @@ console.print(
     )
 )
 
-async def main():
+def main():
     # Build a unified configuration object for Stagehand
     config = StagehandConfig(
         env="BROWSERBASE",
@@ -69,7 +69,7 @@ async def main():
 
     # Initialize - this creates a new session automatically.
     console.print("\n🚀 [info]Initializing Stagehand...[/]")
-    await stagehand.init()
+    stagehand.init()
     console.print(f"\n[yellow]Created new session:[/] {stagehand.session_id}")
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
@@ -90,13 +90,14 @@ async def main():
         auto_screenshot=True,
     )
 
+    # Navigate to google
     console.print("\n▶️ [highlight] Navigating[/] to Google")
-    await stagehand.page.goto("https://google.com/")
+    stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
     
     console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
     agent = stagehand.agent(agent_config)
-    agent_result = await agent.execute(execute_options)
+    agent_result = agent.execute(execute_options)
     
     console.print("📊 [info]Agent execution result:[/]")
     console.print(f"✅ Success: [bold]{'Yes' if agent_result.success else 'No'}[/]")
@@ -115,7 +116,7 @@ async def main():
 
     # Close the session
     console.print("\n⏹️  [warning]Closing session...[/]")
-    await stagehand.close()
+    stagehand.close()
     console.print("✅ [success]Session closed successfully![/]")
     console.rule("[bold]End of Example[/]")
 
@@ -125,9 +126,9 @@ if __name__ == "__main__":
     console.print(
         "\n",
         Panel.fit(
-            "[light_gray]Stagehand 🤘 Async Agent Example[/]",
+            "[light_gray]Stagehand 🤘 Sync Agent Example[/]",
             border_style="green",
             padding=(1, 10),
         ),
     )
-    asyncio.run(main()) 
+    main() 

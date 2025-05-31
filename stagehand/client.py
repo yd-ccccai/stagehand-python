@@ -24,6 +24,7 @@ from .context import StagehandContext
 from .llm import LLMClient
 from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
+from .schemas import AgentConfig
 from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
 
 load_dotenv()
@@ -45,9 +46,6 @@ class Stagehand:
         *,
         config: Optional[StagehandConfig] = None,
         server_url: Optional[str] = None,
-        session_id: Optional[str] = None,
-        browserbase_api_key: Optional[str] = None,
-        browserbase_project_id: Optional[str] = None,
         model_api_key: Optional[str] = None,
         on_log: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
         verbose: int = 1,
@@ -57,9 +55,6 @@ class Stagehand:
         timeout_settings: Optional[httpx.Timeout] = None,
         model_client_options: Optional[dict[str, Any]] = None,
         stream_response: Optional[bool] = None,
-        self_heal: Optional[bool] = None,
-        wait_for_captcha_solves: Optional[bool] = None,
-        system_prompt: Optional[str] = None,
         use_rich_logging: bool = True,
         env: Literal["BROWSERBASE", "LOCAL"] = None,
         local_browser_launch_options: Optional[dict[str, Any]] = None,
@@ -71,21 +66,12 @@ class Stagehand:
         Args:
             config (Optional[StagehandConfig]): Optional configuration object encapsulating common parameters.
             server_url (Optional[str]): The running Stagehand server URL.
-            session_id (Optional[str]): An existing Browserbase session ID.
-            browserbase_api_key (Optional[str]): Your Browserbase API key.
-            browserbase_project_id (Optional[str]): Your Browserbase project ID.
             model_api_key (Optional[str]): Your model API key (e.g. OpenAI, Anthropic, etc.).
             on_log (Optional[Callable[[dict[str, Any]], Awaitable[None]]]): Async callback for log messages from the server.
-            verbose (int): Verbosity level for logs.
-            model_name (Optional[str]): Model name to use when creating a new session.
-            dom_settle_timeout_ms (Optional[int]): Additional time for the DOM to settle (in ms).
-            httpx_client (Optional[httpx.AsyncClient]): Optional custom httpx.AsyncClient instance.
             timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
             model_client_options (Optional[dict[str, Any]]): Optional model client options.
             stream_response (Optional[bool]): Whether to stream responses from the server.
-            self_heal (Optional[bool]): Whether to enable self-healing functionality.
-            wait_for_captcha_solves (Optional[bool]): Whether to wait for CAPTCHA solves.
-            system_prompt (Optional[str]): System prompt for LLM interactions.
+            httpx_client (Optional[httpx.AsyncClient]): Optional custom httpx.AsyncClient instance.
             use_rich_logging (bool): Whether to use Rich for colorized logging.
             env (str): Environment to run in ("BROWSERBASE" or "LOCAL"). Defaults to "BROWSERBASE".
             local_browser_launch_options (Optional[dict[str, Any]]): Options for launching the local browser context
@@ -613,6 +599,26 @@ class Stagehand:
 
         self._initialized = True
 
+    def agent(self, agent_config: AgentConfig) -> Agent:
+        """
+        Create an agent instance configured with the provided options.
+
+        Args:
+            agent_config (AgentConfig): Configuration for the agent instance.
+                                          Provider must be specified or inferrable from the model.
+
+        Returns:
+            Agent: A configured Agent instance ready to execute tasks.
+        """
+        if not self._initialized:
+            raise RuntimeError(
+                "Stagehand must be initialized with await init() before creating an agent."
+            )
+
+        self.logger.debug(f"Creating Agent instance with config: {agent_config}")
+        # Pass the required config directly to the Agent constructor
+        return Agent(self, agent_config=agent_config)
+
     async def close(self):
         """
         Clean up resources.
@@ -702,20 +708,30 @@ class Stagehand:
         if not self.model_api_key:
             raise ValueError("model_api_key is required to create a session.")
 
+        browserbase_session_create_params = (
+            convert_dict_keys_to_camel_case(self.browserbase_session_create_params)
+            if self.browserbase_session_create_params
+            else None
+        )
+
         payload = {
             "modelName": self.model_name,
+            "verbose": 2 if self.verbose == 3 else self.verbose,
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
-            "verbose": self.verbose,
             "browserbaseSessionCreateParams": {
-                "browserSettings": {
-                    "blockAds": True,
-                    "viewport": {
-                        "width": 1024,
-                        "height": 768,
+                browserbase_session_create_params
+                if browserbase_session_create_params
+                else {
+                    "browserSettings": {
+                        "blockAds": True,
+                        "viewport": {
+                            "width": 1024,
+                            "height": 768,
+                        },
                     },
-                },
-                "proxies": True,
+                }
             },
+            "proxies": True,
         }
 
         # Add the new parameters if they have values
@@ -742,6 +758,7 @@ class Stagehand:
             "x-bb-project-id": self.browserbase_project_id,
             "x-model-api-key": self.model_api_key,
             "Content-Type": "application/json",
+            "x-language": "python",
         }
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
