@@ -5,9 +5,7 @@ on:
     branches: [ main, master ]
     paths:
       - '**.py'
-      - 'evals/**'
       - 'stagehand/**'
-      - 'format.sh'
       - 'pyproject.toml'
 
 jobs:
@@ -16,8 +14,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
           
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -29,32 +25,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install black isort ruff
           
-      - name: Make format script executable
-        run: chmod +x ./format.sh
-        
-      - name: Check current formatting status
+      - name: Check Black formatting
         run: |
-          echo "Checking current code formatting..."
-          # Create a backup of current state
-          git stash push -m "backup before format check"
+          echo "Checking Black formatting..."
+          black --check --diff stagehand
           
-      - name: Run format script
-        run: ./format.sh
-        
-      - name: Check for formatting changes
+      - name: Check import sorting
         run: |
-          if git diff --quiet; then
-            echo "✅ Code is properly formatted!"
-            exit 0
-          else
-            echo "❌ Code formatting issues detected!"
-            echo ""
-            echo "The following files need formatting:"
-            git diff --name-only
-            echo ""
-            echo "Please run './format.sh' locally and commit the changes."
-            echo ""
-            echo "Detailed changes:"
-            git diff
-            exit 1
-          fi 
+          echo "Checking import sorting..."
+          isort --check-only --diff stagehand
+          
+      - name: Run Ruff linting
+        run: |
+          echo "Running Ruff linting..."
+          ruff check stagehand 

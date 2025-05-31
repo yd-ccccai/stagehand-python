@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define source directories (adjust as needed)
-SOURCE_DIRS="evals stagehand"
+SOURCE_DIRS="stagehand"
 
 # Apply Black formatting only to source directories
 echo "Applying Black formatting..."
