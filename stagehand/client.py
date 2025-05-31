@@ -26,7 +26,12 @@ from .llm import LLMClient
 from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
 from .schemas import AgentConfig
-from .utils import StagehandLogger, convert_dict_keys_to_camel_case, default_log_handler
+from .utils import (
+    StagehandLogger,
+    convert_dict_keys_to_camel_case,
+    default_log_handler,
+    make_serializable,
+)
 
 load_dotenv()
 
@@ -120,7 +125,7 @@ class Stagehand:
                 else wait_for_captcha_solves
             )
             self.system_prompt = config.system_prompt or system_prompt
-            self.browserbase_session_create_params = (
+            self.browserbase_session_create_params = make_serializable(
                 config.browserbase_session_create_params
                 or browserbase_session_create_params
             )
