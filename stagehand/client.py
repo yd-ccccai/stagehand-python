@@ -731,7 +731,7 @@ class Stagehand:
             "modelName": self.model_name,
             "verbose": 2 if self.verbose == 3 else self.verbose,
             "domSettleTimeoutMs": self.dom_settle_timeout_ms,
-            "browserbaseSessionCreateParams": {
+            "browserbaseSessionCreateParams": (
                 browserbase_session_create_params
                 if browserbase_session_create_params
                 else {
@@ -743,7 +743,7 @@ class Stagehand:
                         },
                     },
                 }
-            },
+            ),
             "proxies": True,
         }
 
