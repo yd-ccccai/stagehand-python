@@ -13,7 +13,7 @@ class TestClientInitialization:
     def test_init_with_direct_params(self):
         """Test initialization with direct parameters."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -21,7 +21,7 @@ class TestClientInitialization:
             verbose=2,
         )
 
-        assert client.server_url == "http://test-server.com"
+        assert client.api_url == "http://test-server.com"
         assert client.session_id == "test-session"
         assert client.browserbase_api_key == "test-api-key"
         assert client.browserbase_project_id == "test-project-id"
@@ -41,11 +41,15 @@ class TestClientInitialization:
             debug_dom=True,
             headless=True,
             enable_caching=True,
+            self_heal=True,
+            wait_for_captcha_solves=True,
+            act_timeout_ms=30000,
+            system_prompt="Custom system prompt for testing",
         )
 
-        client = Stagehand(config=config, server_url="http://test-server.com")
+        client = Stagehand(config=config, api_url="http://test-server.com")
 
-        assert client.server_url == "http://test-server.com"
+        assert client.api_url == "http://test-server.com"
         assert client.session_id == "config-session-id"
         assert client.browserbase_api_key == "config-api-key"
         assert client.browserbase_project_id == "config-project-id"
@@ -54,6 +58,14 @@ class TestClientInitialization:
         assert client.debug_dom is True
         assert client.headless is True
         assert client.enable_caching is True
+        assert hasattr(client, "self_heal")
+        assert client.self_heal is True
+        assert hasattr(client, "wait_for_captcha_solves")
+        assert client.wait_for_captcha_solves is True
+        assert hasattr(client, "act_timeout_ms")
+        assert client.act_timeout_ms == 30000
+        assert hasattr(client, "system_prompt")
+        assert client.system_prompt == "Custom system prompt for testing"
 
     def test_config_priority_over_direct_params(self):
         """Test that config parameters take precedence over direct parameters."""
@@ -98,7 +110,7 @@ class TestClientInitialization:
     def test_init_as_context_manager(self):
         """Test the client as a context manager."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -125,7 +137,7 @@ class TestClientInitialization:
     async def test_create_session(self):
         """Test session creation."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",
@@ -149,7 +161,7 @@ class TestClientInitialization:
     async def test_create_session_failure(self):
         """Test session creation failure."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",
@@ -171,7 +183,7 @@ class TestClientInitialization:
     async def test_create_session_invalid_response(self):
         """Test session creation with invalid response format."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",

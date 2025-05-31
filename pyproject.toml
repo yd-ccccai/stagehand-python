@@ -1,9 +1,55 @@
-[tool.ruff]
-# Enable flake8-comprehensions, flake8-bugbear, naming, etc.
-select = ["E", "F", "B", "C4", "UP", "N", "I", "C"]
-# Ignore line length errors - let Black handle those
-ignore = ["E501"]
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
+[project]
+name = "stagehand-py"
+version = "0.3.10"
+description = "Python SDK for Stagehand"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Browserbase, Inc.", email = "support@browserbase.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "httpx>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=1.10.0",
+    "playwright>=1.42.1",
+    "requests>=2.31.0",
+    "browserbase>=1.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.3.1",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "mypy>=1.3.0",
+    "ruff",
+    "rich",  # Useful for development/debugging
+]
+
+[project.urls]
+Homepage = "https://github.com/browserbase/stagehand-python"
+Repository = "https://github.com/browserbase/stagehand-python"
+
+[tool.setuptools]
+packages = ["stagehand"]
+
+[tool.setuptools.package-data]
+stagehand = ["domScripts.js"]
+
+[tool.ruff]
 # Same as Black
 line-length = 88
 
@@ -21,10 +67,14 @@ exclude = [
     "tests"
 ]
 
+# Define lint-specific settings here
+[tool.ruff.lint]
+select = ["E", "F", "B", "C4", "UP", "N", "I", "C"]
+# Ignore line length errors - let Black handle those
+ignore = ["E501", "C901"]
 # Allow autofix for all enabled rules (when `--fix` is provided)
 fixable = ["ALL"]
 unfixable = []
-
 # Allow unused variables when underscore-prefixed
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 

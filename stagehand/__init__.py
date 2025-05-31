@@ -1,7 +1,46 @@
+from .agent import Agent
 from .client import Stagehand
-from .config import StagehandConfig
+from .config import StagehandConfig, default_config
+from .handlers.observe_handler import ObserveHandler
+from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
+from .schemas import (
+    ActOptions,
+    ActResult,
+    AgentConfig,
+    AgentExecuteOptions,
+    AgentExecuteResult,
+    AgentProvider,
+    AvailableModel,
+    ExtractOptions,
+    ExtractResult,
+    ObserveOptions,
+    ObserveResult,
+)
+from .utils import configure_logging
 
-__version__ = "0.2.2"
+__version__ = "0.3.9"   #for pypi "stagehand"
 
-__all__ = ["Stagehand", "StagehandConfig", "StagehandPage"]
+__all__ = [
+    "Stagehand",
+    "StagehandConfig",
+    "default_config",
+    "StagehandPage",
+    "Agent",
+    "configure_logging",
+    "ActOptions",
+    "ActResult",
+    "AvailableModel",
+    "ExtractOptions",
+    "ExtractResult",
+    "ObserveOptions",
+    "ObserveResult",
+    "AgentConfig",
+    "AgentExecuteOptions",
+    "AgentExecuteResult",
+    "AgentProvider",
+    "ObserveHandler",
+    "observe",
+    "StagehandFunctionName",
+    "StagehandMetrics",
+]

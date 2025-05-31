@@ -1,21 +1,14 @@
 import asyncio
 import logging
 import os
+
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
-import json
-from dotenv import load_dotenv
 
-from stagehand import Stagehand, StagehandConfig
-from stagehand.utils import configure_logging
-
-# Configure logging with cleaner format
-configure_logging(
-    level=logging.INFO,
-    remove_logger_name=True,  # Remove the redundant stagehand.client prefix
-    quiet_dependencies=True,   # Suppress httpx and other noisy logs
-)
+from stagehand import Stagehand, StagehandConfig, AgentConfig, configure_logging
+from stagehand.schemas import AgentExecuteOptions, AgentProvider
 
 # Create a custom theme for consistent styling
 custom_theme = Theme(
@@ -33,6 +26,12 @@ custom_theme = Theme(
 console = Console(theme=custom_theme)
 
 load_dotenv()
+
+# Configure logging with the utility function
+configure_logging(
+    level=logging.INFO,  # Set to INFO for regular logs, DEBUG for detailed
+    quiet_dependencies=True,  # Reduce noise from dependencies
+)
 
 console.print(
     Panel.fit(
@@ -54,67 +53,65 @@ async def main():
         project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
         headless=False,
         dom_settle_timeout_ms=3000,
-        model_name="google/gemini-2.0-flash",
+        model_name="gpt-4o",
         self_heal=True,
         wait_for_captcha_solves=True,
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
         model_client_options={"apiKey": os.getenv("MODEL_API_KEY")},
-        # Use verbose=2 for medium-detail logs (1=minimal, 3=debug)
         verbose=2,
     )
 
-    stagehand = Stagehand(config)
+    # Create a Stagehand client using the configuration object.
+    stagehand = Stagehand(
+        config=config, 
+        api_url=os.getenv("STAGEHAND_API_URL"),
+    )
 
     # Initialize - this creates a new session automatically.
     console.print("\n🚀 [info]Initializing Stagehand...[/]")
     await stagehand.init()
-    page = stagehand.page
     console.print(f"\n[yellow]Created new session:[/] {stagehand.session_id}")
     console.print(
         f"🌐 [white]View your live browser:[/] [url]https://www.browserbase.com/sessions/{stagehand.session_id}[/]"
     )
-
-    await asyncio.sleep(2)
+    
+    # Configure the agent
+    agent_config = AgentConfig(
+        provider=AgentProvider.OPENAI,
+        model="computer-use-preview",
+        instructions="You are a helpful web navigation assistant that helps users find information. You are currently on the following page: google.com. Do not ask follow up questions, the user will trust your judgement.",
+        options={"apiKey": os.getenv("MODEL_API_KEY")}
+    )
+    
+    # Define the task for the agent
+    execute_options = AgentExecuteOptions(
+        instruction="Play a game of 2048",
+        max_steps=20,
+        auto_screenshot=True,
+    )
 
     console.print("\n▶️ [highlight] Navigating[/] to Google")
-    await page.goto("https://google.com/")
+    await stagehand.page.goto("https://google.com/")
     console.print("✅ [success]Navigated to Google[/]")
-
-    console.print("\n▶️ [highlight] Clicking[/] on About link")
-    # Click on the "About" link using Playwright
-    await page.get_by_role("link", name="About", exact=True).click()
-    console.print("✅ [success]Clicked on About link[/]")
-
-    await asyncio.sleep(2)
-    console.print("\n▶️ [highlight] Navigating[/] back to Google")
-    await page.goto("https://google.com/")
-    console.print("✅ [success]Navigated back to Google[/]")
-
-    console.print("\n▶️ [highlight] Performing action:[/] search for openai")
-    await page.act("search for openai")
-    await page.keyboard.press("Enter")
-    console.print("✅ [success]Performing Action:[/] Action completed successfully")
     
-    await asyncio.sleep(2)
-
-    console.print("\n▶️ [highlight] Observing page[/] for news button")
-    observed = await page.observe("find all articles")
+    console.print("\n▶️ [highlight] Using Agent to perform a task[/]: playing a game of 2048")
+    agent = stagehand.agent(agent_config)
+    agent_result = await agent.execute(execute_options)
     
-    if len(observed) > 0:
-        element = observed[0]
-        console.print("✅ [success]Found element:[/] News button")
-        console.print("\n▶️ [highlight] Performing action on observed element:")
-        console.print(element)
-        await page.act(element)
-        console.print("✅ [success]Performing Action:[/] Action completed successfully")
-
-    else:
-        console.print("❌ [error]No element found[/]")
-
-    console.print("\n▶️ [highlight] Extracting[/] first search result")
-    data = await page.extract("extract the first result from the search")
-    console.print("📊 [info]Extracted data:[/]")
-    console.print_json(f"{data.model_dump_json()}")
+    console.print("📊 [info]Agent execution result:[/]")
+    console.print(f"✅ Success: [bold]{'Yes' if agent_result.success else 'No'}[/]")
+    console.print(f"🎯 Completed: [bold]{'Yes' if agent_result.completed else 'No'}[/]")
+    if agent_result.message:
+        console.print(f"💬 Message: [italic]{agent_result.message}[/]")
+    
+    if agent_result.actions:
+        console.print(f"🔄 Actions performed: [bold]{len(agent_result.actions)}[/]")
+        for i, action in enumerate(agent_result.actions):
+            console.print(f"  Action {i+1}: {action.get('type', 'Unknown')} - {action.get('description', 'No description')}")
+    
+    # For debugging, you can also print the full JSON
+    console.print("[dim]Full response JSON:[/]")
+    console.print_json(f"{agent_result.model_dump_json()}")
 
     # Close the session
     console.print("\n⏹️  [warning]Closing session...[/]")
@@ -128,9 +125,9 @@ if __name__ == "__main__":
     console.print(
         "\n",
         Panel.fit(
-            "[light_gray]Stagehand 🤘 Python Example[/]",
+            "[light_gray]Stagehand 🤘 Async Agent Example[/]",
             border_style="green",
             padding=(1, 10),
         ),
     )
-    asyncio.run(main())
+    asyncio.run(main()) 
