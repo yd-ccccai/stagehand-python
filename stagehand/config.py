@@ -84,3 +84,21 @@ class StagehandConfig(BaseModel):
     )
 
     model_config = ConfigDict(populate_by_name=True)
+
+    def with_overrides(self, **overrides) -> "StagehandConfig":
+        """
+        Create a new config instance with the specified overrides.
+        
+        Args:
+            **overrides: Key-value pairs to override in the config
+            
+        Returns:
+            StagehandConfig: New config instance with overrides applied
+        """
+        config_dict = self.model_dump()
+        config_dict.update(overrides)
+        return StagehandConfig(**config_dict)
+
+
+# Default configuration instance
+default_config = StagehandConfig()

@@ -15,7 +15,7 @@ class TestClientAPI:
     async def mock_client(self):
         """Create a mock Stagehand client for testing."""
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -32,7 +32,7 @@ class TestClientAPI:
             # Print debug info
             print("\n==== EXECUTING TEST_METHOD ====")
             print(
-                f"URL: {mock_client.server_url}/sessions/{mock_client.session_id}/{method}"
+                f"URL: {mock_client.api_url}/sessions/{mock_client.session_id}/{method}"
             )
             print(f"Payload: {payload}")
             print(
@@ -86,7 +86,7 @@ class TestClientAPI:
             # Print debug info
             print("\n==== EXECUTING TEST_METHOD ====")
             print(
-                f"URL: {mock_client.server_url}/sessions/{mock_client.session_id}/{method}"
+                f"URL: {mock_client.api_url}/sessions/{mock_client.session_id}/{method}"
             )
             print(f"Payload: {payload}")
             print(
@@ -114,7 +114,7 @@ class TestClientAPI:
             # Print debug info
             print("\n==== EXECUTING TEST_METHOD ====")
             print(
-                f"URL: {mock_client.server_url}/sessions/{mock_client.session_id}/{method}"
+                f"URL: {mock_client.api_url}/sessions/{mock_client.session_id}/{method}"
             )
             print(f"Payload: {payload}")
             print(

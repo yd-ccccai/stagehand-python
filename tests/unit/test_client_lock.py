@@ -13,7 +13,7 @@ class TestClientLock:
     async def mock_stagehand(self):
         """Create a mock Stagehand instance for testing."""
         stagehand = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="test-session-id",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -43,14 +43,14 @@ class TestClientLock:
     async def test_lock_per_session(self):
         """Test that different sessions get different locks."""
         stagehand1 = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="session-1",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
         )
 
         stagehand2 = Stagehand(
-            server_url="http://localhost:8000",
+            api_url="http://localhost:8000",
             session_id="session-2",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",

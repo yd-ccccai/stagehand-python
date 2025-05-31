@@ -1,6 +1,6 @@
 from .agent import Agent
 from .client import Stagehand
-from .config import StagehandConfig
+from .config import StagehandConfig, default_config
 from .handlers.observe_handler import ObserveHandler
 from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
@@ -24,6 +24,7 @@ __version__ = "0.3.9"   #for pypi "stagehand"
 __all__ = [
     "Stagehand",
     "StagehandConfig",
+    "default_config",
     "StagehandPage",
     "Agent",
     "configure_logging",

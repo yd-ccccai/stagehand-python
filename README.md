@@ -135,7 +135,7 @@ def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     stagehand.init()
     print(f"Session created: {stagehand.session_id}")
 
@@ -185,7 +185,7 @@ async def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     await stagehand.init()
     print(f"Session created: {stagehand.session_id}")
     
@@ -239,7 +239,7 @@ def main():
     )
 
     # Initialize Stagehand
-    stagehand = Stagehand(config=config, server_url=os.getenv("STAGEHAND_API_URL"))
+    stagehand = Stagehand(config=config, api_url=os.getenv("STAGEHAND_API_URL"))
     stagehand.init()
     print(f"Session created: {stagehand.session_id}")
     

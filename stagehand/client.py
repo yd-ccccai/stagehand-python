@@ -20,7 +20,7 @@ from playwright.async_api import (
 from playwright.async_api import Page as PlaywrightPage
 
 from .agent import Agent
-from .config import StagehandConfig
+from .config import StagehandConfig, default_config
 from .context import StagehandContext
 from .llm import LLMClient
 from .metrics import StagehandFunctionName, StagehandMetrics
@@ -41,7 +41,8 @@ class Stagehand:
     Python client for interacting with a running Stagehand server and Browserbase remote headless browser.
 
     Now supports automatically creating a new session if no session_id is provided.
-    You can also optionally provide a configuration via the 'config' parameter to centralize all parameters.
+    You can provide a configuration via the 'config' parameter, or use individual parameters to override
+    the default configuration values.
     """
 
     # Dictionary to store one lock per session_id
@@ -49,115 +50,88 @@ class Stagehand:
 
     def __init__(
         self,
-        *,
         config: Optional[StagehandConfig] = None,
-        server_url: Optional[str] = None,
+        *,
+        api_url: Optional[str] = None,
         model_api_key: Optional[str] = None,
-        on_log: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
-        verbose: int = 1,
-        model_name: Optional[str] = None,
-        dom_settle_timeout_ms: Optional[int] = None,
+        session_id: Optional[str] = None,
+        env: Optional[Literal["BROWSERBASE", "LOCAL"]] = None,
         httpx_client: Optional[httpx.AsyncClient] = None,
         timeout_settings: Optional[httpx.Timeout] = None,
-        model_client_options: Optional[dict[str, Any]] = None,
-        stream_response: Optional[bool] = None,
         use_rich_logging: bool = True,
-        env: Literal["BROWSERBASE", "LOCAL"] = None,
-        local_browser_launch_options: Optional[dict[str, Any]] = None,
-        browserbase_session_create_params: Optional[BrowserbaseSessionCreateParams] = None,
-        browserbase_api_key: Optional[str] = None,
-        browserbase_project_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        self_heal: bool = True,
-        wait_for_captcha_solves: bool = True,
-        system_prompt: Optional[str] = None,
+        **config_overrides,
     ):
         """
         Initialize the Stagehand client.
 
         Args:
-            config (Optional[StagehandConfig]): Optional configuration object encapsulating common parameters.
-            server_url (Optional[str]): The running Stagehand server URL.
-            model_api_key (Optional[str]): Your model API key (e.g. OpenAI, Anthropic, etc.).
-            on_log (Optional[Callable[[dict[str, Any]], Awaitable[None]]]): Async callback for log messages from the server.
-            timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
-            model_client_options (Optional[dict[str, Any]]): Optional model client options.
-            stream_response (Optional[bool]): Whether to stream responses from the server.
+            config (Optional[StagehandConfig]): Configuration object. If not provided, uses default_config.
+            api_url (Optional[str]): The running Stagehand server URL. Overrides config if provided.
+            model_api_key (Optional[str]): Your model API key (e.g. OpenAI, Anthropic, etc.). Overrides config if provided.
+            session_id (Optional[str]): Existing Browserbase session ID to connect to. Overrides config if provided.
+            env (Optional[Literal["BROWSERBASE", "LOCAL"]]): Environment to run in. Overrides config if provided.
             httpx_client (Optional[httpx.AsyncClient]): Optional custom httpx.AsyncClient instance.
+            timeout_settings (Optional[httpx.Timeout]): Optional custom timeout settings for httpx.
             use_rich_logging (bool): Whether to use Rich for colorized logging.
-            env (str): Environment to run in ("BROWSERBASE" or "LOCAL"). Defaults to "BROWSERBASE".
-            local_browser_launch_options (Optional[dict[str, Any]]): Options for launching the local browser context
-                when env="LOCAL". See Playwright's launch_persistent_context documentation.
-                Common keys: 'headless', 'user_data_dir', 'downloads_path', 'viewport', 'locale', 'proxy', 'args', 'cdp_url'.
-            browserbase_session_create_params (Optional[BrowserbaseSessionCreateParams]): Params for Browserbase session creation.
-            browserbase_api_key (Optional[str]): Browserbase API key for authentication.
-            browserbase_project_id (Optional[str]): Browserbase project ID.
-            session_id (Optional[str]): Existing Browserbase session ID to connect to.
-            self_heal (bool): Whether to enable self-healing capabilities.
-            wait_for_captcha_solves (bool): Whether to wait for CAPTCHA solutions.
-            system_prompt (Optional[str]): Custom system prompt for the AI model.
+            **config_overrides: Additional configuration overrides to apply to the config.
         """
-        # Initialize configuration from config object or individual parameters
-        self.server_url = server_url or os.getenv("STAGEHAND_SERVER_URL")
-
-        if config:
-            self.browserbase_api_key = (
-                config.api_key
-                or browserbase_api_key
-                or os.getenv("BROWSERBASE_API_KEY")
-            )
-            self.browserbase_project_id = (
-                config.project_id
-                or browserbase_project_id
-                or os.getenv("BROWSERBASE_PROJECT_ID")
-            )
-            self.session_id = config.browserbase_session_id or session_id
-            self.model_name = config.model_name or model_name
-            self.dom_settle_timeout_ms = (
-                config.dom_settle_timeout_ms or dom_settle_timeout_ms
-            )
-            self.self_heal = (
-                config.self_heal if config.self_heal is not None else self_heal
-            )
-            self.wait_for_captcha_solves = (
-                config.wait_for_captcha_solves
-                if config.wait_for_captcha_solves is not None
-                else wait_for_captcha_solves
-            )
-            self.system_prompt = config.system_prompt or system_prompt
-            self.browserbase_session_create_params = make_serializable(
-                config.browserbase_session_create_params
-                or browserbase_session_create_params
-            )
-            self.verbose = config.verbose if config.verbose is not None else verbose
+        # Start with provided config or default config
+        if config is None:
+            config = default_config
+        
+        # Apply any overrides
+        overrides = {}
+        if api_url is not None:
+            # api_url isn't in config, handle separately
+            pass
+        if model_api_key is not None:
+            # model_api_key isn't in config, handle separately  
+            pass
+        if session_id is not None:
+            overrides['browserbase_session_id'] = session_id
+        if env is not None:
+            overrides['env'] = env
+        
+        # Add any additional config overrides
+        overrides.update(config_overrides)
+        
+        # Create final config with overrides
+        if overrides:
+            self.config = config.with_overrides(**overrides)
         else:
-            self.browserbase_api_key = browserbase_api_key or os.getenv(
-                "BROWSERBASE_API_KEY"
-            )
-            self.browserbase_project_id = browserbase_project_id or os.getenv(
-                "BROWSERBASE_PROJECT_ID"
-            )
-            self.session_id = session_id
-            self.model_name = model_name
-            self.dom_settle_timeout_ms = dom_settle_timeout_ms
-            self.self_heal = self_heal
-            self.wait_for_captcha_solves = wait_for_captcha_solves
-            self.system_prompt = system_prompt
-            self.browserbase_session_create_params = browserbase_session_create_params
-            self.verbose = verbose
+            self.config = config
 
-        # Handle model-related settings directly
+        # Handle non-config parameters
+        self.api_url = api_url or os.getenv("STAGEHAND_API_URL")
         self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
-        self.model_client_options = model_client_options or {}
+        
+        # Extract frequently used values from config for convenience
+        self.browserbase_api_key = self.config.api_key or os.getenv("BROWSERBASE_API_KEY")
+        self.browserbase_project_id = self.config.project_id or os.getenv("BROWSERBASE_PROJECT_ID")
+        self.session_id = self.config.browserbase_session_id
+        self.model_name = self.config.model_name
+        self.dom_settle_timeout_ms = self.config.dom_settle_timeout_ms
+        self.self_heal = self.config.self_heal
+        self.wait_for_captcha_solves = self.config.wait_for_captcha_solves
+        self.system_prompt = self.config.system_prompt
+        self.verbose = self.config.verbose
+        self.env = self.config.env.upper() if self.config.env else "BROWSERBASE"
+        self.local_browser_launch_options = self.config.local_browser_launch_options or {}
+
+        # Handle model-related settings
+        self.model_client_options = {}
         if self.model_api_key and "apiKey" not in self.model_client_options:
             self.model_client_options["apiKey"] = self.model_api_key
 
-        # Handle streaming response setting directly
-        self.streamed_response = (
-            stream_response if stream_response is not None else True
+        # Handle browserbase session create params
+        self.browserbase_session_create_params = make_serializable(
+            self.config.browserbase_session_create_params
         )
 
-        self.on_log = on_log or default_log_handler
+        # Handle streaming response setting
+        self.streamed_response = True
+
+        self.httpx_client = httpx_client
         self.timeout_settings = timeout_settings or httpx.Timeout(
             connect=180.0,
             read=180.0,
@@ -165,12 +139,6 @@ class Stagehand:
             pool=180.0,
         )
 
-        self.env = env.upper() if env else "BROWSERBASE"
-        self.local_browser_launch_options = (
-            getattr(config, "local_browser_launch_options", {})
-            if config
-            else local_browser_launch_options if local_browser_launch_options else {}
-        )
         self._local_user_data_dir_temp: Optional[Path] = (
             None  # To store path if created temporarily
         )
@@ -184,8 +152,9 @@ class Stagehand:
             raise ValueError("env must be either 'BROWSERBASE' or 'LOCAL'")
 
         # Initialize the centralized logger with the specified verbosity
+        self.on_log = self.config.logger or default_log_handler
         self.logger = StagehandLogger(
-            verbose=self.verbose, external_logger=on_log, use_rich=use_rich_logging
+            verbose=self.verbose, external_logger=self.on_log, use_rich=use_rich_logging
         )
 
         # If using BROWSERBASE, session_id or creation params are needed
@@ -216,7 +185,6 @@ class Stagehand:
                         "browserbase_project_id is required for BROWSERBASE env with existing session_id (or set BROWSERBASE_PROJECT_ID in env)."
                     )
 
-        self.httpx_client = httpx_client
         self._client: Optional[httpx.AsyncClient] = (
             None  # Used for server communication in BROWSERBASE
         )
@@ -393,7 +361,7 @@ class Stagehand:
 
             # Create session if we don't have one
             if not self.session_id:
-                await self._create_session()  # Uses self._client and server_url
+                await self._create_session()  # Uses self._client and api_url
                 self.logger.debug(
                     f"Created new Browserbase session via Stagehand server: {self.session_id}"
                 )
@@ -782,7 +750,7 @@ class Stagehand:
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         async with client:
             resp = await client.post(
-                f"{self.server_url}/sessions/start",
+                f"{self.api_url}/sessions/start",
                 json=payload,
                 headers=headers,
             )
@@ -816,7 +784,7 @@ class Stagehand:
 
         client = self.httpx_client or httpx.AsyncClient(timeout=self.timeout_settings)
         self.logger.debug(f"\n==== EXECUTING {method.upper()} ====")
-        self.logger.debug(f"URL: {self.server_url}/sessions/{self.session_id}/{method}")
+        self.logger.debug(f"URL: {self.api_url}/sessions/{self.session_id}/{method}")
         self.logger.debug(f"Payload: {modified_payload}")
         self.logger.debug(f"Headers: {headers}")
 
@@ -825,7 +793,7 @@ class Stagehand:
                 # Always use streaming for consistent log handling
                 async with client.stream(
                     "POST",
-                    f"{self.server_url}/sessions/{self.session_id}/{method}",
+                    f"{self.api_url}/sessions/{self.session_id}/{method}",
                     json=modified_payload,
                     headers=headers,
                 ) as response:

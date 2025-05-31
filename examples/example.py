@@ -54,7 +54,7 @@ async def main():
         project_id=os.getenv("BROWSERBASE_PROJECT_ID"),
         headless=False,
         dom_settle_timeout_ms=3000,
-        model_name="gpt-4o-mini",
+        model_name="google/gemini-2.0-flash",
         self_heal=True,
         wait_for_captcha_solves=True,
         system_prompt="You are a browser automation assistant that helps users navigate websites effectively.",
@@ -63,10 +63,7 @@ async def main():
         verbose=2,
     )
 
-    stagehand = Stagehand(
-        config=config, 
-        server_url=os.getenv("STAGEHAND_API_URL"),
-    )
+    stagehand = Stagehand(config)
 
     # Initialize - this creates a new session automatically.
     console.print("\n🚀 [info]Initializing Stagehand...[/]")

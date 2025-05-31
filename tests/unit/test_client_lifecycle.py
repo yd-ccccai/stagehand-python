@@ -49,7 +49,7 @@ class TestClientLifecycle:
         """Test initializing with an existing session ID."""
         # Setup client with a session ID
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -90,7 +90,7 @@ class TestClientLifecycle:
         """Test initializing without a session ID creates a new session."""
         # Setup client without a session ID
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
             model_api_key="test-model-api-key",
@@ -135,7 +135,7 @@ class TestClientLifecycle:
         """Test calling init when already initialized."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -173,7 +173,7 @@ class TestClientLifecycle:
         """Test initialization when browser already has contexts."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -208,7 +208,7 @@ class TestClientLifecycle:
         """Test initialization when browser has no contexts."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -262,7 +262,7 @@ class TestClientLifecycle:
         """Test client close method."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -322,7 +322,7 @@ class TestClientLifecycle:
         """Test error handling in close method."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -378,7 +378,7 @@ class TestClientLifecycle:
         """Test calling close when already closed."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
@@ -431,7 +431,7 @@ class TestClientLifecycle:
         """Test a full init-close lifecycle."""
         # Setup client
         client = Stagehand(
-            server_url="http://test-server.com",
+            api_url="http://test-server.com",
             session_id="test-session-123",
             browserbase_api_key="test-api-key",
             browserbase_project_id="test-project-id",
