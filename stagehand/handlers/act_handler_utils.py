@@ -444,7 +444,7 @@ async def handle_possible_page_navigation(
             },
         )
 
-    if new_opened_tab:
+    if new_opened_tab and new_opened_tab.url != 'about:blank':
         logger.info(
             message="new page detected (new tab) with URL",
             category="action",
