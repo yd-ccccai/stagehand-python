@@ -23,17 +23,12 @@ jobs:
       - name: Install formatting dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black isort ruff
+          pip install black ruff
           
       - name: Check Black formatting
         run: |
           echo "Checking Black formatting..."
           black --check --diff stagehand
-          
-      - name: Check import sorting
-        run: |
-          echo "Checking import sorting..."
-          isort --check-only --diff stagehand
           
       - name: Run Ruff linting
         run: |
