@@ -4,13 +4,11 @@ import os
 import shutil
 import tempfile
 import time
-from collections.abc import Awaitable
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Literal, Optional
 
 import httpx
 from browserbase import Browserbase
-from browserbase.types import SessionCreateParams as BrowserbaseSessionCreateParams
 from dotenv import load_dotenv
 from playwright.async_api import (
     BrowserContext,
