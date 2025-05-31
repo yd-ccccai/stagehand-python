@@ -87,6 +87,7 @@ class StagehandContext:
 
             return wrapped_new_page
         elif name == "pages":
+
             async def wrapped_pages():
                 pw_pages = self._context.pages
                 # Return StagehandPage objects

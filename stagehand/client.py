@@ -76,23 +76,23 @@ class Stagehand:
         # Start with provided config or default config
         if config is None:
             config = default_config
-        
+
         # Apply any overrides
         overrides = {}
         if api_url is not None:
             # api_url isn't in config, handle separately
             pass
         if model_api_key is not None:
-            # model_api_key isn't in config, handle separately  
+            # model_api_key isn't in config, handle separately
             pass
         if session_id is not None:
-            overrides['browserbase_session_id'] = session_id
+            overrides["browserbase_session_id"] = session_id
         if env is not None:
-            overrides['env'] = env
-        
+            overrides["env"] = env
+
         # Add any additional config overrides
         overrides.update(config_overrides)
-        
+
         # Create final config with overrides
         if overrides:
             self.config = config.with_overrides(**overrides)
@@ -102,10 +102,14 @@ class Stagehand:
         # Handle non-config parameters
         self.api_url = api_url or os.getenv("STAGEHAND_API_URL")
         self.model_api_key = model_api_key or os.getenv("MODEL_API_KEY")
-        
+
         # Extract frequently used values from config for convenience
-        self.browserbase_api_key = self.config.api_key or os.getenv("BROWSERBASE_API_KEY")
-        self.browserbase_project_id = self.config.project_id or os.getenv("BROWSERBASE_PROJECT_ID")
+        self.browserbase_api_key = self.config.api_key or os.getenv(
+            "BROWSERBASE_API_KEY"
+        )
+        self.browserbase_project_id = self.config.project_id or os.getenv(
+            "BROWSERBASE_PROJECT_ID"
+        )
         self.session_id = self.config.browserbase_session_id
         self.model_name = self.config.model_name
         self.dom_settle_timeout_ms = self.config.dom_settle_timeout_ms
@@ -114,7 +118,9 @@ class Stagehand:
         self.system_prompt = self.config.system_prompt
         self.verbose = self.config.verbose
         self.env = self.config.env.upper() if self.config.env else "BROWSERBASE"
-        self.local_browser_launch_options = self.config.local_browser_launch_options or {}
+        self.local_browser_launch_options = (
+            self.config.local_browser_launch_options or {}
+        )
 
         # Handle model-related settings
         self.model_client_options = {}
