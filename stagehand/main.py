@@ -28,7 +28,6 @@ from .llm import LLMClient
 from .logging import StagehandLogger, default_log_handler
 from .metrics import StagehandFunctionName, StagehandMetrics
 from .page import StagehandPage
-from .schemas import AgentConfig
 from .utils import make_serializable
 
 load_dotenv()
@@ -168,7 +167,6 @@ class Stagehand:
         self._context: Optional[BrowserContext] = None
         self._playwright_page: Optional[PlaywrightPage] = None
         self.page: Optional[StagehandPage] = None
-        self.agent = None
         self.context: Optional[StagehandContext] = None
 
         self._initialized = False  # Flag to track if init() has run
@@ -441,7 +439,7 @@ class Stagehand:
 
         self._initialized = True
 
-    def agent(self, agent_config: AgentConfig) -> Agent:
+    def agent(self, **kwargs) -> Agent:
         """
         Create an agent instance configured with the provided options.
 
@@ -457,9 +455,9 @@ class Stagehand:
                 "Stagehand must be initialized with await init() before creating an agent."
             )
 
-        self.logger.debug(f"Creating Agent instance with config: {agent_config}")
+        self.logger.debug(f"Creating Agent instance with config: {kwargs}")
         # Pass the required config directly to the Agent constructor
-        return Agent(self, agent_config=agent_config)
+        return Agent(self, **kwargs)
 
     async def close(self):
         """
