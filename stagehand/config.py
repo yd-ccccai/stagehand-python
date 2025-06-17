@@ -30,6 +30,8 @@ class StagehandConfig(BaseModel):
         headless (bool): Run browser in headless mode
         system_prompt (Optional[str]): System prompt to use for LLM interactions.
         local_browser_launch_options (Optional[dict[str, Any]]): Local browser launch options.
+        use_api (bool): Whether to use API mode.
+        experimental (bool): Enable experimental features.
     """
 
     env: Literal["BROWSERBASE", "LOCAL"] = "BROWSERBASE"
@@ -43,7 +45,7 @@ class StagehandConfig(BaseModel):
         "https://api.stagehand.browserbase.com/v1",
         alias="apiUrl",
         description="Stagehand API URL",
-    )  # might add a default value here
+    )
     model_api_key: Optional[str] = Field(
         None, alias="modelApiKey", description="Model API key"
     )
