@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Any
 
 from .utils import convert_dict_keys_to_camel_case
@@ -67,6 +68,7 @@ async def _create_session(self):
         "x-bb-project-id": self.browserbase_project_id,
         "x-model-api-key": self.model_api_key,
         "Content-Type": "application/json",
+        "x-sent-at": datetime.now().isoformat(),
         "x-language": "python",
     }
 
@@ -96,6 +98,7 @@ async def _execute(self, method: str, payload: dict[str, Any]) -> Any:
         "x-bb-project-id": self.browserbase_project_id,
         "Content-Type": "application/json",
         "Connection": "keep-alive",
+        "x-sent-at": datetime.now().isoformat(),
         # Always enable streaming for better log handling
         "x-stream-response": "true",
     }
