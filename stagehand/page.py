@@ -606,7 +606,7 @@ class StagehandPage:
                         meta.pop(request_id, None)
                         self._stagehand.logger.debug(
                             "⏳ forcing completion of stalled iframe document",
-                            extra={"url": request_meta["url"][:120]},
+                            auxiliary={"url": request_meta["url"][:120]},
                         )
                 maybe_quiet()
 
@@ -620,7 +620,7 @@ class StagehandPage:
                 if len(inflight) > 0:
                     self._stagehand.logger.debug(
                         "⚠️ DOM-settle timeout reached – network requests still pending",
-                        extra={"count": len(inflight)},
+                        auxiliary={"count": len(inflight)},
                     )
                 resolve_done()
 
