@@ -15,6 +15,7 @@ from .anthropic_cua import AnthropicCUAClient
 from .client import AgentClient
 from .google_cua import GoogleCUAClient
 from .openai_cua import OpenAICUAClient
+from .native_agent import NativeAgentClient
 
 MODEL_TO_CLIENT_CLASS_MAP: dict[str, type[AgentClient]] = {
     "computer-use-preview-03-11": OpenAICUAClient,
@@ -58,7 +59,8 @@ class Agent:
                 self.logger.error(
                     "Stagehand page object not available for CUAHandler initialization."
                 )
-                raise ValueError("Stagehand page not initialized. Cannot create Agent.")
+                raise ValueError(
+                    "Stagehand page not initialized. Cannot create Agent.")
 
             self.cua_handler = CUAHandler(
                 stagehand=self.stagehand,
@@ -72,31 +74,47 @@ class Agent:
 
     def _get_client(self) -> AgentClient:
         ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)  # noqa: N806
-        if not ClientClass:
-            self.logger.error(
-                f"Unsupported model or client not mapped: {self.config.model}"
-            )
-            raise ValueError(
-                f"Unsupported model or client not mapped: {self.config.model}"
+        if ClientClass:
+            return ClientClass(
+                model=self.config.model,
+                instructions=(
+                    self.config.instructions
+                    if self.config.instructions
+                    else "Your browser is in full screen mode. There is no search bar, or navigation bar, or shortcut to control it. You can use the goto tool to navigate to different urls. Do not try to access a top navigation bar or other browser features."
+                ),
+                config=self.config,
+                logger=self.logger,
+                handler=self.cua_handler,
+                viewport=self.viewport,
+                experimental=self.stagehand.experimental,
             )
 
-        return ClientClass(
-            model=self.config.model,
+        # Fallback to Native Agent for non-CUA models
+        self.logger.info(
+            f"Falling back to NativeAgentClient for model: {self.config.model}",
+            category="agent",
+        )
+        return NativeAgentClient(
+            model=self.config.model or "unknown-model",
             instructions=(
                 self.config.instructions
                 if self.config.instructions
-                else "Your browser is in full screen mode. There is no search bar, or navigation bar, or shortcut to control it. You can use the goto tool to navigate to different urls. Do not try to access a top navigation bar or other browser features."
+                else (
+                    "You are Stagehand's Native Agent. Use the provided tools to navigate and act. "
+                    "Prefer observe via ariaTree and screenshot to understand state. Use close when done."
+                )
             ),
             config=self.config,
             logger=self.logger,
-            handler=self.cua_handler,
+            handler=self.cua_handler,  # reuse for access to stagehand + page
             viewport=self.viewport,
             experimental=self.stagehand.experimental,
         )
 
     async def execute(
         self,
-        options_or_instruction: Union[AgentExecuteOptions, str, dict, None] = None,
+        options_or_instruction: Union[AgentExecuteOptions,
+                                      str, dict, None] = None,
         **kwargs,
     ) -> AgentResult:
         options: Optional[AgentExecuteOptions] = None
@@ -195,7 +213,8 @@ class Agent:
                 # Ensure all expected fields are present
                 # If not present in result, use defaults from AgentExecuteResult schema
                 if "success" not in result:
-                    raise ValueError("Response missing required field 'success'")
+                    raise ValueError(
+                        "Response missing required field 'success'")
 
                 # Ensure completed is set with default if not present
                 if "completed" not in result:
@@ -216,4 +235,5 @@ class Agent:
                 )
             else:
                 # If the result is not a dict and not None, it's unexpected
-                raise TypeError(f"Unexpected result type from server: {type(result)}")
+                raise TypeError(
+                    f"Unexpected result type from server: {type(result)}")
