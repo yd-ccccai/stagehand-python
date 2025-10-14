@@ -6,6 +6,8 @@ from typing import Any, Optional
 from stagehand.llm.client import LLMClient
 from stagehand.schemas import AgentExecuteOptions
 from stagehand.types.agent import AgentConfig, AgentResult, AgentUsage
+from stagehand.a11y.utils import get_accessibility_tree, prune_accessibility_tree
+from stagehand.utils import json_dumps_with_budget, truncate_string
 
 from .client import AgentClient
 from .native_tools import tool_dispatch
@@ -90,6 +92,71 @@ class NativeAgentClient(AgentClient):
         messages: list[dict[str, Any]] = []
         if self.instructions:
             messages.append({"role": "system", "content": self.instructions})
+
+        # Optionally inject initial A11y context before the first request
+        try:
+            mode = getattr(self.stagehand.config,
+                           "agent_initial_a11y_context_mode", "none")
+        except Exception:
+            mode = "none"
+
+        if mode and mode != "none":
+            try:
+                tree = await get_accessibility_tree(self.stagehand.page, self.stagehand.logger)
+                parts: list[str] = []
+
+                if mode in ("text", "both"):
+                    text_budget = getattr(
+                        self.stagehand.config, "agent_a11y_text_max_chars", None)
+                    simplified_text = tree.get("simplified", "")
+                    simplified_text = truncate_string(
+                        simplified_text, text_budget)
+                    if simplified_text:
+                        parts.append(
+                            f"A11yContext (simplified):\n{simplified_text}")
+
+                if mode in ("json", "both"):
+                    max_depth = getattr(
+                        self.stagehand.config, "agent_a11y_json_max_depth", None)
+                    max_children = getattr(
+                        self.stagehand.config, "agent_a11y_json_max_children", None)
+                    json_budget = getattr(
+                        self.stagehand.config, "agent_a11y_json_max_chars", None)
+
+                    pruned = prune_accessibility_tree(
+                        tree.get("tree", []) or [],
+                        max_depth=max_depth,
+                        max_children=max_children,
+                    )
+                    pruned_json = json_dumps_with_budget(pruned, json_budget)
+                    if pruned_json:
+                        parts.append(
+                            f"A11yContext (json, trimmed):\n{pruned_json}")
+
+                if parts:
+                    a11y_context_str = "\n\n".join(parts)
+                    messages.append(
+                        {"role": "system", "content": a11y_context_str})
+                    # Debug log sizes only (avoid logging full content)
+                    try:
+                        self.logger.debug(
+                            "Injected initial A11y context",
+                            category="agent",
+                            auxiliary={
+                                "mode": mode,
+                                "parts": len(parts),
+                                "text_len": len(parts[0]) if parts else 0,
+                            },
+                        )
+                    except Exception:
+                        pass
+            except Exception as inj_err:
+                # Non-fatal; proceed without injection
+                self.logger.debug(
+                    f"Skipping initial A11y injection due to error: {inj_err}",
+                    category="agent",
+                )
+
         messages.append({"role": "user", "content": instruction})
 
         tools = build_openai_tools_schemas()

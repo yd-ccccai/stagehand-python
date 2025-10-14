@@ -44,7 +44,8 @@ class StagehandConfig(BaseModel):
         None, alias="projectId", description="Browserbase project ID"
     )
     api_url: Optional[str] = Field(
-        os.environ.get("STAGEHAND_API_URL", "https://api.stagehand.browserbase.com/v1"),
+        os.environ.get("STAGEHAND_API_URL",
+                       "https://api.stagehand.browserbase.com/v1"),
         alias="apiUrl",
         description="Stagehand API URL",
     )
@@ -116,6 +117,36 @@ class StagehandConfig(BaseModel):
         False,
         alias=None,
         description="Whether to use experimental features",
+    )
+
+    # --- Native Agent Initial A11y Context Injection (Python parity with TS) ---
+    agent_initial_a11y_context_mode: Optional[Literal["none", "text", "json", "both"]] = Field(
+        "none",
+        alias="agentInitialA11yContextMode",
+        description=(
+            "Controls whether to inject accessibility context into the initial LLM request "
+            "for the Native Agent. Options: 'none', 'text', 'json', 'both'."
+        ),
+    )
+    agent_a11y_text_max_chars: Optional[int] = Field(
+        None,
+        alias="agentA11yTextMaxChars",
+        description="Maximum characters for simplified text A11y context (no hardcoded model limits).",
+    )
+    agent_a11y_json_max_chars: Optional[int] = Field(
+        None,
+        alias="agentA11yJsonMaxChars",
+        description="Maximum characters for JSON A11y context after pruning (no hardcoded model limits).",
+    )
+    agent_a11y_json_max_depth: Optional[int] = Field(
+        None,
+        alias="agentA11yJsonMaxDepth",
+        description="Maximum depth when pruning the JSON A11y tree before injection.",
+    )
+    agent_a11y_json_max_children: Optional[int] = Field(
+        None,
+        alias="agentA11yJsonMaxChildren",
+        description="Maximum children per node when pruning the JSON A11y tree before injection.",
     )
 
     model_config = ConfigDict(populate_by_name=True)

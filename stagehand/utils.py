@@ -6,6 +6,8 @@ from pydantic import AnyUrl, BaseModel, Field, HttpUrl, create_model
 from pydantic.fields import FieldInfo
 
 from stagehand.types.a11y import AccessibilityNode
+import json
+from typing import Any, Optional
 
 
 def snake_to_camel(snake_str: str) -> str:
@@ -87,7 +89,8 @@ def convert_dict_keys_to_snake_case(data: Any) -> Any:
     if isinstance(data, dict):
         converted: dict[str, Any] = {}
         for key, value in data.items():
-            converted_key = camel_to_snake(key) if isinstance(key, str) else key
+            converted_key = camel_to_snake(
+                key) if isinstance(key, str) else key
             converted[converted_key] = convert_dict_keys_to_snake_case(value)
         return converted
     if isinstance(data, list):
@@ -107,6 +110,34 @@ def format_simplified_tree(node: AccessibilityNode, level: int = 0) -> str:
             format_simplified_tree(child, level + 1) for child in children
         )
     return result
+
+
+def truncate_string(value: str, max_chars: Optional[int]) -> str:
+    """
+    Truncate a string to max_chars if provided; otherwise return as-is.
+    """
+    if value is None:
+        return value
+    if max_chars is None or max_chars <= 0:
+        return value
+    if len(value) <= max_chars:
+        return value
+    # Reserve a small suffix marker
+    suffix = "…"
+    keep = max(0, max_chars - len(suffix))
+    return value[:keep] + suffix
+
+
+def json_dumps_with_budget(obj: Any, max_chars: Optional[int]) -> str:
+    """
+    Dump JSON compactly and apply an optional character budget.
+    """
+    try:
+        dumped = json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+    except Exception:
+        # Fallback to str if object isn't serializable
+        dumped = str(obj)
+    return truncate_string(dumped, max_chars)
 
 
 async def draw_observe_overlay(page, elements: list[dict]):
@@ -337,7 +368,8 @@ def transform_model(model_cls, path=[]):  # noqa: F841 B006
                     Field(**field_info.field_info.model_dump()),
                 )
             else:
-                field_definitions[field_name] = (new_type, Field(**field_kwargs))
+                field_definitions[field_name] = (
+                    new_type, Field(**field_kwargs))
 
             # Add child paths to our collected paths
             if child_paths:
@@ -432,7 +464,8 @@ def transform_type(annotation, path):
                 for cp in child_paths:
                     if isinstance(cp, dict) and "segments" in cp:
                         segments = cp["segments"]
-                        url_paths.append({"segments": [f"union_{i}"] + segments})
+                        url_paths.append(
+                            {"segments": [f"union_{i}"] + segments})
                     else:
                         url_paths.append({"segments": [f"union_{i}"]})
 

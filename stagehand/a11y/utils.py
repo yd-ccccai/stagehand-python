@@ -15,6 +15,7 @@ from ..types.a11y import (
     TreeResult,
 )
 from ..utils import format_simplified_tree
+from ..types.a11y import AccessibilityNode
 
 
 async def _clean_structural_nodes(
@@ -38,7 +39,8 @@ async def _clean_structural_nodes(
         _clean_structural_nodes(child, page, logger) for child in children
     ]
     resolved_children = await asyncio.gather(*cleaned_children_tasks)
-    cleaned_children = [child for child in resolved_children if child is not None]
+    cleaned_children = [
+        child for child in resolved_children if child is not None]
 
     # 4) Prune "generic" or "none" nodes first
     node_role = node.get("role")
@@ -76,7 +78,8 @@ async def _clean_structural_nodes(
                             "returnByValue": True,
                         },
                     )
-                    result_value = tag_name_result.get("result", {}).get("value")
+                    result_value = tag_name_result.get(
+                        "result", {}).get("value")
                     if result_value:
                         if node_role == "combobox" and result_value == "select":
                             result_value = "select"
@@ -94,11 +97,13 @@ async def _clean_structural_nodes(
             # Use logger.debug (level 2)
             logger.debug(
                 message=f"Could not resolve DOM node ID {backend_node_id}",
-                auxiliary={"error": {"value": str(resolve_error), "type": "string"}},
+                auxiliary={"error": {"value": str(
+                    resolve_error), "type": "string"}},
             )
 
     # Remove redundant StaticText children
-    cleaned_children = _remove_redundant_static_text_children(node, cleaned_children)
+    cleaned_children = _remove_redundant_static_text_children(
+        node, cleaned_children)
 
     # If no children left after cleaning and role is structural, remove node
     if not cleaned_children:
@@ -161,7 +166,8 @@ async def build_hierarchical_tree(
             # Optional fields
             **({"name": str(name_value)} if has_valid_name else {}),
             **(
-                {"description": str(node_data.get("description", {}).get("value"))}
+                {"description": str(node_data.get(
+                    "description", {}).get("value"))}
                 if node_data.get("description", {}).get("value")
                 else {}
             ),
@@ -204,7 +210,8 @@ async def build_hierarchical_tree(
                 parent_node["children"].append(node_map[node_id])
 
     # Final pass: Build root-level tree and clean up
-    root_nodes = [node for node in node_map.values() if not node.get("parentId")]
+    root_nodes = [node for node in node_map.values()
+                  if not node.get("parentId")]
 
     cleaned_tree_tasks = [
         _clean_structural_nodes(node, page, logger) for node in root_nodes
@@ -213,7 +220,8 @@ async def build_hierarchical_tree(
     final_tree = [node for node in final_tree_nullable if node is not None]
 
     # Generate simplified string representation
-    simplified_format = "\n".join(format_simplified_tree(node) for node in final_tree)
+    simplified_format = "\n".join(
+        format_simplified_tree(node) for node in final_tree)
 
     return {
         "tree": final_tree,
@@ -221,6 +229,66 @@ async def build_hierarchical_tree(
         "iframes": iframe_list,
         "idToUrl": id_to_url,
     }
+
+
+def _prune_node(
+    node: AccessibilityNode,
+    current_depth: int,
+    max_depth: Optional[int],
+    max_children: Optional[int],
+) -> AccessibilityNode:
+    """
+    Return a pruned copy of a node with depth and child-count limits applied.
+    """
+    # Shallow copy without mutating original
+    pruned: AccessibilityNode = {
+        k: v for k, v in node.items() if k != "children"
+    }  # exclude children for now
+
+    # If max depth reached, drop children entirely
+    if max_depth is not None and current_depth >= max_depth:
+        return pruned
+
+    children = node.get("children") or []
+    if not children:
+        return pruned
+
+    # Limit number of children if configured
+    limited_children = (
+        children[: max_children] if (
+            max_children is not None and max_children >= 0) else children
+    )
+
+    pruned_children: list[AccessibilityNode] = []
+    for child in limited_children:
+        pruned_children.append(
+            _prune_node(child, current_depth + 1, max_depth, max_children)
+        )
+
+    if pruned_children:
+        pruned["children"] = pruned_children
+    return pruned
+
+
+def prune_accessibility_tree(
+    nodes: list[AccessibilityNode],
+    *,
+    max_depth: Optional[int] = None,
+    max_children: Optional[int] = None,
+) -> list[AccessibilityNode]:
+    """
+    Create a pruned copy of the accessibility tree with optional depth and
+    per-node children caps. Does not mutate the input tree.
+    """
+    if not nodes:
+        return []
+
+    pruned_roots: list[AccessibilityNode] = []
+    for root in nodes:
+        pruned_roots.append(
+            _prune_node(root, 0, max_depth, max_children)
+        )
+    return pruned_roots
 
 
 async def get_accessibility_tree(
@@ -238,7 +306,8 @@ async def get_accessibility_tree(
         for node_data in nodes:
             backend_id = node_data.get("backendDOMNodeId")
             role_value_obj = node_data.get("role")
-            role_value = role_value_obj.get("value", "") if role_value_obj else ""
+            role_value = role_value_obj.get(
+                "value", "") if role_value_obj else ""
 
             if backend_id in scrollable_backend_ids:
                 if role_value in ("generic", "none", ""):
@@ -281,7 +350,8 @@ async def get_accessibility_tree(
                 await page.disable_cdp_domain("Accessibility")
             except Exception:
                 # Use logger.debug (level 2)
-                logger.debug("Failed to disable Accessibility domain on cleanup.")
+                logger.debug(
+                    "Failed to disable Accessibility domain on cleanup.")
 
 
 # JavaScript function to get XPath (remains JavaScript)
@@ -417,7 +487,8 @@ async def find_scrollable_element_ids(stagehand_page: "StagehandPage") -> set[in
                                 "objectId": object_id,
                             },
                         )
-                        backend_node_id = node_info.get("node", {}).get("backendNodeId")
+                        backend_node_id = node_info.get(
+                            "node", {}).get("backendNodeId")
                         if backend_node_id:
                             scrollable_backend_ids.add(backend_node_id)
                     except Exception:
