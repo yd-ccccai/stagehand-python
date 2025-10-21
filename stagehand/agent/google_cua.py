@@ -23,7 +23,6 @@ from ..types.agent import (
     AgentConfig,
     AgentExecuteOptions,
     AgentResult,
-    FunctionAction,
 )
 from .client import AgentClient
 
@@ -567,34 +566,19 @@ class GoogleCUAClient(AgentClient):
                         )
                         current_url = self.handler.page.url
 
-                    function_name_called_for_feedback = ""
-                    if agent_action.action_type == "function" and isinstance(
-                        agent_action.action.root, FunctionAction
-                    ):
-                        function_name_called_for_feedback = (
-                            agent_action.action.root.name
+                    if not invoked_function_name:
+                        self.logger.error(
+                            "Original Google function name not found for feedback loop (was None).",
+                            category="agent",
                         )
-                        self._format_action_feedback(
-                            function_name_called=function_name_called_for_feedback,
-                            action_result=action_result,
-                            new_screenshot_base64=current_screenshot_b64,
-                            current_url=current_url,
-                            function_call_args=function_call_args,
-                        )
-                    else:
-                        if not invoked_function_name:
-                            self.logger.error(
-                                "Original Google function name not found for feedback loop (was None).",
-                                category="agent",
-                            )
-                        else:
-                            self._format_action_feedback(
-                                function_name_called=invoked_function_name,
-                                action_result=action_result,
-                                new_screenshot_base64=current_screenshot_b64,
-                                current_url=current_url,
-                                function_call_args=function_call_args,
-                            )
+
+                    self._format_action_feedback(
+                        function_name_called=invoked_function_name,
+                        action_result=action_result,
+                        new_screenshot_base64=current_screenshot_b64,
+                        current_url=current_url,
+                        function_call_args=function_call_args,
+                    )
 
             if task_completed:
                 self.logger.info(
