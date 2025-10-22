@@ -17,6 +17,15 @@ from .context import StagehandContext
 from .logging import StagehandLogger
 from .page import StagehandPage
 
+# Parameter mapping for camelCase to snake_case conversion
+# Used when processing local_browser_launch_options
+LAUNCH_OPTION_PARAM_MAPPING = {
+    "acceptDownloads": "accept_downloads",
+    "bypassCSP": "bypass_csp",
+    "ignoreHTTPSErrors": "ignore_https_errors",
+    "timezoneId": "timezone_id",
+}
+
 
 async def connect_browserbase_browser(
     playwright: Playwright,
@@ -67,7 +76,8 @@ async def connect_browserbase_browser(
             stagehand_instance.session_id = session.id
         connect_url = session.connectUrl
     except Exception as e:
-        logger.error(f"Error retrieving or validating Browserbase session: {str(e)}")
+        logger.error(
+            f"Error retrieving or validating Browserbase session: {str(e)}")
         raise
 
     logger.debug(f"Connecting to remote browser at: {connect_url}")
@@ -78,7 +88,8 @@ async def connect_browserbase_browser(
         raise
 
     existing_contexts = browser.contexts
-    logger.debug(f"Existing contexts in remote browser: {len(existing_contexts)}")
+    logger.debug(
+        f"Existing contexts in remote browser: {len(existing_contexts)}")
     if existing_contexts:
         context = existing_contexts[0]
     else:
@@ -134,18 +145,21 @@ async def connect_local_browser(
             )
 
             if not browser.contexts:
-                raise RuntimeError(f"No browser contexts found at CDP URL: {cdp_url}")
+                raise RuntimeError(
+                    f"No browser contexts found at CDP URL: {cdp_url}")
             context = browser.contexts[0]
             stagehand_context = await StagehandContext.init(context, stagehand_instance)
             logger.debug(f"Connected via CDP. Using context: {context}")
         except Exception as e:
-            logger.error(f"Failed to connect via CDP URL ({cdp_url}): {str(e)}")
+            logger.error(
+                f"Failed to connect via CDP URL ({cdp_url}): {str(e)}")
             raise
     else:
         logger.info("Launching new local browser context...")
         browser = None
 
-        user_data_dir_option = local_browser_launch_options.get("user_data_dir")
+        user_data_dir_option = local_browser_launch_options.get(
+            "user_data_dir")
         if user_data_dir_option:
             user_data_dir = Path(user_data_dir_option).resolve()
         else:
@@ -169,7 +183,8 @@ async def connect_local_browser(
                     f"Failed to write default preferences to {prefs_path}: {e}"
                 )
 
-        downloads_path_option = local_browser_launch_options.get("downloads_path")
+        downloads_path_option = local_browser_launch_options.get(
+            "downloads_path")
         if downloads_path_option:
             downloads_path = str(Path(downloads_path_option).resolve())
         else:
@@ -178,9 +193,11 @@ async def connect_local_browser(
             os.makedirs(downloads_path, exist_ok=True)
             logger.debug(f"Using downloads_path: {downloads_path}")
         except Exception as e:
-            logger.error(f"Failed to create downloads_path {downloads_path}: {e}")
+            logger.error(
+                f"Failed to create downloads_path {downloads_path}: {e}")
 
         # Prepare Launch Options (translate keys if needed)
+        # Step 1: Build launch_options with default values for known parameters
         launch_options = {
             "headless": local_browser_launch_options.get("headless", False),
             "accept_downloads": local_browser_launch_options.get(
@@ -206,7 +223,39 @@ async def connect_local_browser(
                 "ignoreHTTPSErrors", True
             ),
         }
-        launch_options = {k: v for k, v in launch_options.items() if v is not None}
+
+        # Step 2: Parameters that have been explicitly handled above
+        # (either with special logic or with default values)
+        handled_params = {
+            "headless",
+            "acceptDownloads",
+            "args",
+            "viewport",
+            "locale",
+            "timezoneId",
+            "bypassCSP",
+            "proxy",
+            "ignoreHTTPSErrors",
+            "user_data_dir",  # Handled separately before launch_options
+            "downloads_path",  # Handled separately before launch_options
+            "cdp_url",  # Used for CDP connection, not a launch option
+            "headers",  # Used for CDP connection, not a launch option
+            "cookies",  # Handled separately after context launch
+        }
+
+        # Step 3: Pass through any additional parameters from local_browser_launch_options
+        # Apply parameter name mapping where needed, otherwise use as-is
+        for key, value in local_browser_launch_options.items():
+            if key in handled_params:
+                continue  # Skip parameters we've already handled
+
+            # Apply mapping if key is in LAUNCH_OPTION_PARAM_MAPPING, otherwise use as-is
+            target_key = LAUNCH_OPTION_PARAM_MAPPING.get(key, key)
+            launch_options[target_key] = value
+
+        # Step 4: Filter out None values
+        launch_options = {k: v for k,
+                          v in launch_options.items() if v is not None}
 
         # Launch Context
         try:
