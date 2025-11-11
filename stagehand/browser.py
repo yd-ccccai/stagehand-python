@@ -285,7 +285,7 @@ async def connect_local_browser(
                 logger.error(f"Failed to add cookies: {e}")
 
     # Apply stealth scripts
-    await apply_stealth_scripts(context, logger)
+    # await apply_stealth_scripts(context, logger)
 
     # Get the initial page (usually one is created by default)
     if context.pages:
