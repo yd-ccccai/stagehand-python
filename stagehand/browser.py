@@ -199,7 +199,9 @@ async def connect_local_browser(
         # Prepare Launch Options (translate keys if needed)
         # Step 1: Build launch_options with default values for known parameters
         launch_options = {
-            "headless": local_browser_launch_options.get("headless", False),
+            "headless": local_browser_launch_options.get(
+                "headless", stagehand_instance.config.headless
+            ),
             "accept_downloads": local_browser_launch_options.get(
                 "acceptDownloads", True
             ),
