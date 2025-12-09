@@ -16,6 +16,7 @@ from .client import AgentClient
 from .google_cua import GoogleCUAClient
 from .openai_cua import OpenAICUAClient
 from .native_agent import NativeAgentClient
+from .qwen_vl_cua import QwenVLCUAClient
 
 MODEL_TO_CLIENT_CLASS_MAP: dict[str, type[AgentClient]] = {
     "computer-use-preview-2025-03-11": OpenAICUAClient,
@@ -26,6 +27,7 @@ MODEL_TO_CLIENT_CLASS_MAP: dict[str, type[AgentClient]] = {
     "claude-sonnet-4-5-20250929": AnthropicCUAClient,
     "claude-opus-4-5-20251101": AnthropicCUAClient,
     "gemini-2.5-computer-use-preview-10-2025": GoogleCUAClient,
+    # Qwen VL models are matched dynamically by model name containing "qwen"
 }
 MODEL_TO_PROVIDER_MAP: dict[str, AgentProvider] = {
     "computer-use-preview-2025-03-11": AgentProvider.OPENAI,
@@ -36,7 +38,7 @@ MODEL_TO_PROVIDER_MAP: dict[str, AgentProvider] = {
     "claude-sonnet-4-5-20250929": AgentProvider.ANTHROPIC,
     "claude-opus-4-5-20251101": AgentProvider.ANTHROPIC,
     "gemini-2.5-computer-use-preview-10-2025": AgentProvider.GOOGLE,
-    # Add more mappings as needed
+    # Qwen VL models are matched dynamically by model name containing "qwen"
 }
 
 AGENT_METRIC_FUNCTION_NAME = "AGENT_EXECUTE_TASK"
@@ -51,6 +53,9 @@ class Agent:
         if self.stagehand.use_api:
             if self.config.model in MODEL_TO_PROVIDER_MAP:
                 self.provider = MODEL_TO_PROVIDER_MAP[self.config.model]
+            elif self.config.model and "qwen" in self.config.model.lower():
+                # Dynamic matching for Qwen models
+                self.provider = AgentProvider.QWEN
             else:
                 self.provider = None
                 self.logger.error(
@@ -77,7 +82,11 @@ class Agent:
             self.client: AgentClient = self._get_client()
 
     def _get_client(self) -> AgentClient:
-        ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)  # noqa: N806
+        # Dynamic matching for Qwen models (any model name containing "qwen")
+        if self.config.model and "qwen" in self.config.model.lower():
+            ClientClass = QwenVLCUAClient  # noqa: N806
+        else:
+            ClientClass = MODEL_TO_CLIENT_CLASS_MAP.get(self.config.model)  # noqa: N806
         if ClientClass:
             return ClientClass(
                 model=self.config.model,
